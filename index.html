@@ -1,0 +1,422 @@
+/***** Sianes Point — Apps Script v38 *****/
+
+/* ===== Spreadsheet config ===== */
+var SPREADSHEET_ID = "1bdK2O6d_YgrCCuH3RGgwEUaY2O5WPJA-zEkp_BSFYR8";
+var TZ = Session.getScriptTimeZone() || "Asia/Bangkok";
+var SHEETS = {
+  USERS:"Users",
+  REWARDS:"Rewards",
+  ACTIVITIES:"Activities",
+  SUBMISSIONS:"Submissions",
+  REDEMPTIONS:"Redemptions",
+  ANSWER_KEY:"AnswerKey",
+  LOGS:"Logs",
+  ADMINS:"Admins" // fallback ถ้าไม่มีชีต getAdmins
+};
+
+/* ===== Script Properties =====
+  RTDB_URL = https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app/
+  FIREBASE_CLIENT_EMAIL
+  FIREBASE_PRIVATE_KEY
+*/
+function PROP(){ return PropertiesService.getScriptProperties(); }
+function RTDB_URL(){ return (PROP().getProperty("RTDB_URL")||"").replace(/\/+$/,"")+"/"; }
+function FIREBASE_CLIENT_EMAIL(){ return PROP().getProperty("FIREBASE_CLIENT_EMAIL")||""; }
+function FIREBASE_PRIVATE_KEY(){ var k=PROP().getProperty("FIREBASE_PRIVATE_KEY")||""; return k.replace(/\\n/g,"\n"); }
+
+/* ===== Utils ===== */
+function SS(){ return SpreadsheetApp.openById(SPREADSHEET_ID); }
+function num(v){ v=Number(v); return isFinite(v)?v:0; }
+function nowISO(){ return Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd'T'HH:mm:ssXXX"); }
+function parseHeader_(arr){ var H={},i; for(i=0;i<arr.length;i++){ H[String(arr[i]).trim()]=i; } return H; }
+function readSheet_(name){
+  var sh=SS().getSheetByName(name), v=sh.getDataRange().getDisplayValues();
+  if(v.length<2) return {sh:sh,H:{},vals:v,rows:[]};
+  var H=parseHeader_(v[0]); return {sh:sh,H:H,vals:v,rows:v.slice(1)};
+}
+function log_(action,msg,details){
+  try{ SS().getSheetByName(SHEETS.LOGS).appendRow([nowISO(),"",action,"",String(msg||""),JSON.stringify(details||{}),""]); }catch(e){}
+}
+
+/* ===== Service Account → access_token ===== */
+function getAccessToken_(){
+  var header={alg:"RS256",typ:"JWT"};
+  var now=Math.floor(Date.now()/1000);
+  var claim={
+    iss:FIREBASE_CLIENT_EMAIL(),
+    scope:"https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
+    aud:"https://oauth2.googleapis.com/token",
+    iat:now,exp:now+3600
+  };
+  function b64(o){ return Utilities.base64EncodeWebSafe(Utilities.newBlob(JSON.stringify(o)).getBytes()).replace(/=+$/,""); }
+  var unsigned=b64(header)+"."+b64(claim);
+  var sig=Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(unsigned,FIREBASE_PRIVATE_KEY())).replace(/=+$/,"");
+  var jwt=unsigned+"."+sig;
+  var res=UrlFetchApp.fetch("https://oauth2.googleapis.com/token",{
+    method:"post",
+    payload:{grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:jwt}
+  });
+  return JSON.parse(res.getContentText()).access_token;
+}
+function rtdbPut_(path,obj){
+  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
+  var t=getAccessToken_();
+  UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{
+    method:"put",contentType:"application/json",payload:JSON.stringify(obj),muteHttpExceptions:true
+  });
+}
+function rtdbPatch_(path,obj){
+  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
+  var t=getAccessToken_();
+  UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{
+    method:"patch",contentType:"application/json",payload:JSON.stringify(obj),muteHttpExceptions:true
+  });
+}
+function rtdbGet_(path){
+  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
+  var t=getAccessToken_();
+  var res=UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{muteHttpExceptions:true});
+  return JSON.parse(res.getContentText()||"null");
+}
+
+/* ===== Readers ===== */
+function readUsers(){
+  var o=readSheet_(SHEETS.USERS),H=o.H,rows=o.rows,out={},i,r,sap;
+  for(i=0;i<rows.length;i++){
+    r=rows[i]; sap=String(r[H.SAP]||"").trim(); if(!sap) continue;
+    out[sap]={sap:sap,name:r[H.Name]||"",type:r[H.Type]||"",status:r[H.Status]||"",
+      pointsEarned:num(r[H.PointsEarned]),pointsUsed:num(r[H.PointsUsed]),pointsTotal:num(r[H.PointsTotal])};
+  } return out;
+}
+function readRewards(){
+  var o=readSheet_(SHEETS.REWARDS),H=o.H,rows=o.rows,out={},i,r,name;
+  for(i=0;i<rows.length;i++){
+    r=rows[i]; 
+    name=String(r[H.RewardName]||"").trim(); 
+    if(!name) continue;
+
+    var rawUrl = r[H.ImageURL] || r[H.ImageUrl] || r[H.Image] || "";
+    var imageUrl = rawUrl;
+    if(rawUrl.indexOf("drive.google.com/file/d/")>-1){
+      var match = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if(match && match[1]) imageUrl = "https://drive.google.com/uc?export=view&id=" + match[1];
+    }
+    out[name] = {
+      pointsRequired:num(r[H.PointsRequired]),
+      stock:num(r[H.StockRemaining]),
+      imageUrl:imageUrl
+    };
+  }
+  return out;
+}
+function readActivities(){
+  var o=readSheet_(SHEETS.ACTIVITIES),H=o.H,rows=o.rows,out={},i,r,id;
+  for(i=0;i<rows.length;i++){
+    r=rows[i]; id=String(r[H.ActID]||"").trim(); if(!id) continue;
+    out[id]={ActID:id,Category:String(r[H.Category]||""),GroupId:String(r[H.GroupId]||""),
+      Title:String(r[H.Title]||""),Question:String(r[H.Question]||""),InputType:String(r[H.InputType]||"choice"),
+      OptionA:String(r[H.OptionA]||"ก"),OptionB:String(r[H.OptionB]||"ข"),Answer:String(r[H.Answer]||""),
+      BasePoints:num(r[H.BasePoints]||0),CorrectBonus:num(r[H.CorrectBonus]||0),
+      FirstN:num(r[H.FirstN]||0),FirstNBonus:num(r[H.FirstNBonus]||0),
+      FirstNRequiresCorrect:String(r[H.FirstNRequiresCorrect]||"").toLowerCase()==="true",
+      WindowStart:String(r[H.WindowStart]||""),WindowEnd:String(r[H.WindowEnd]||""),AnswerReleaseAt:String(r[H.AnswerReleaseAt]||"")};
+  } return out;
+}
+
+/* ===== Writers (อัปเดตเฉพาะแถว) ===== */
+function writeUsersTotal_(sap,dEarned,dUsed){
+  var o=readSheet_(SHEETS.USERS),sh=o.sh,H=o.H,v=o.vals,i,row;
+  for(i=1;i<v.length;i++){
+    row=v[i];
+    if(String(row[H.SAP]).trim()===String(sap)){
+      var earned=num(row[H.PointsEarned])+num(dEarned||0);
+      var used  =num(row[H.PointsUsed])  +num(dUsed||0);
+      var total =earned-used;
+      sh.getRange(i+1, H.PointsEarned+1, 1, 3).setValues([[earned, used, total]]);
+      return {earned:earned,used:used,total:total};
+    }
+  } throw new Error("SAP not found: "+sap);
+}
+function adjustRewardStock_(rewardName,delta){
+  var o=readSheet_(SHEETS.REWARDS),sh=o.sh,H=o.H,v=o.vals,i,row;
+  for(i=1;i<v.length;i++){
+    row=v[i];
+    if(String(row[H.RewardName]).trim()===String(rewardName)){
+      var before=num(row[H.StockRemaining]), after=before+num(delta||0);
+      if(after<0) throw new Error("ของรางวัลไม่พอ");
+      sh.getRange(i+1, H.StockRemaining+1).setValue(after);
+      return {before:before,after:after};
+    }
+  } throw new Error("Reward not found: "+rewardName);
+}
+function appendRedemption_(sap,rewardName,pts,stockBefore,stockAfter,note){
+  SS().getSheetByName(SHEETS.REDEMPTIONS)
+     .appendRow([nowISO(),sap,rewardName,num(pts||0),num(stockBefore||0),num(stockAfter||0),note||""]);
+}
+function appendSubmission_(o){
+  SS().getSheetByName(SHEETS.SUBMISSIONS)
+    .appendRow([o.ts,o.sap,o.actId,o.answer,o.correct,o.points,o.source,o.category,o.groupId,o.finalized]);
+}
+
+/* ===== Policy (คะแนน) ===== */
+function policyFor_(cat){
+  var p={ base:2, bonusCorrect:2, firstN:20, firstNBonus:2, firstNNeedCorrect:true };
+  if(/MON_/i.test(cat)){ p.base=2; p.bonusCorrect=1; p.firstN=20; p.firstNBonus=1; }
+  else if(/WED_/i.test(cat)){ p.base=2; p.bonusCorrect=2; p.firstN=20; p.firstNBonus=2; }
+  else if(/FRI_/i.test(cat)){ p.base=2; p.bonusCorrect=2; p.firstN=20; p.firstNBonus=2; }
+  else if(/DAY(1|16)_LOTTO/i.test(cat)){ p.base=0; p.bonusCorrect=3; p.firstN=0; p.firstNBonus=0; }
+  return p;
+}
+function pushWinner_(actId,sap){
+  try{
+    var base="secure/activities/"+encodeURIComponent(actId)+"/winners";
+    var list=rtdbGet_(base)||[]; if(list.indexOf(String(sap))===-1){
+      list.push(String(sap));
+      rtdbPut_(base,list.slice(0,200));
+      rtdbPut_("public/winners/"+encodeURIComponent(actId),list.slice(0,20));
+    }
+  }catch(e){ log_("winner_err",String(e),{act:actId,sap:sap}); }
+}
+
+/* ===== Public Snapshot ===== */
+function refreshSnapshots(){
+  var users=readUsers(), rewards=readRewards(), acts=readActivities();
+  rtdbPut_("public/usersSummary",users);
+  rtdbPut_("public/rewards",rewards);
+  rtdbPut_("public/activities",acts);
+
+  var arr=[],k; for(k in users) if(users.hasOwnProperty(k)){ arr.push({sap:k,name:users[k].name||k,pts:num(users[k].pointsTotal)}); }
+  arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
+  rtdbPut_("public/leaderboard",arr.slice(0,20));
+  return {ok:true};
+}
+
+/* ===== NEW: อ่านรายชื่อ Admins จากชีต getAdmins (fallback: SHEETS.ADMINS) ===== */
+function getAdmins(){
+  try{
+    var sh = SS().getSheetByName("getAdmins") || SS().getSheetByName(SHEETS.ADMINS);
+    if(!sh) return {ok:false, error:"Sheet getAdmins/Admins not found"};
+    var v = sh.getDataRange().getDisplayValues();
+    if(v.length < 2) return {ok:false, error:"No rows"};
+
+    var H = parseHeader_(v[0]);
+    var cand = ["Name","Admin","AdminName","DisplayName"];
+    var idx = -1, i;
+    for(i=0;i<cand.length;i++){ if(H.hasOwnProperty(cand[i])) { idx = H[cand[i]]; break; } }
+    if(idx < 0) idx = 0;
+
+    var set = {};
+    for(i=1;i<v.length;i++){
+      var name = String(v[i][idx] || "").trim();
+      if(name) set[name] = true;
+    }
+    var list = Object.keys(set);
+    return {ok:true, items:list};
+  }catch(err){
+    return {ok:false, error:String(err)};
+  }
+}
+
+/* ===== JSONP Web API ===== */
+function doGet(e){
+  var cb=(e && e.parameter && e.parameter.callback) || "callback";
+  var action=(e && e.parameter && String(e.parameter.action||"")) || "";
+  var out;
+  try{
+    if(action==="submitActivity"){
+      out=submitActivity_(String(e.parameter.sap||""),String(e.parameter.actId||""),String(e.parameter.answer||""),String(e.parameter.source||"web"));
+    }else if(action==="redeemReward"){
+      out=redeemReward_(String(e.parameter.sap||""),String(e.parameter.rewardName||""));
+    }else if(action==="confirmRedeem"){
+      out=confirmRedeem_(String(e.parameter.sap||""),String(e.parameter.rewardName||""),String(e.parameter.admin||""),String(e.parameter.ts||""),Number(e.parameter.points||0));
+    }else if(action==="refreshSnapshots"){
+      out=refreshSnapshots();
+    }else if(action==="getAdmins"){
+      out=getAdmins();
+    }else{
+      out={ok:false,error:"Unknown action"};
+    }
+  }catch(err){ out={ok:false,error:String(err && err.message || err)}; }
+  return ContentService.createTextOutput(cb+"("+JSON.stringify(out)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+/* ===== Submissions (กันตอบซ้ำ + คิดแต้ม) ===== */
+function hasSubmission_(sap,actId){
+  var o=readSheet_(SHEETS.SUBMISSIONS),H=o.H,rows=o.rows,i,r;
+  for(i=0;i<rows.length;i++){ r=rows[i]; if(String(r[H.SAP]||"")===String(sap) && String(r[H.ActID]||"")===String(actId)) return true; }
+  return false;
+}
+function submitActivity_(sap,actId,answer,source){
+  if(!sap) throw new Error("sap required");
+  if(!actId) throw new Error("actId required");
+  if(hasSubmission_(sap,actId)) return {ok:false,error:"ตอบกิจกรรมนี้แล้ว"};
+
+  var acts=readActivities(), act=acts[actId]; if(!act) throw new Error("Activity not found: "+actId);
+  var now=new Date();
+  if(act.WindowStart && now < new Date(act.WindowStart)) return {ok:false,error:"ยังไม่ถึงเวลา"};
+  if(act.WindowEnd   && now > new Date(act.WindowEnd))   return {ok:false,error:"หมดเวลาแล้ว"};
+
+  var pol=policyFor_(act.Category||"");
+  var reveal=(act.Answer||"").trim();
+  var correct=null, points=0, finalized=false;
+
+  if(reveal){
+    correct=String(answer||"").toUpperCase()===reveal.toUpperCase();
+    points+=num(pol.base);
+    if(correct){
+      points+=num(pol.bonusCorrect);
+      if(pol.firstN>0){
+        var winners=rtdbGet_("secure/activities/"+encodeURIComponent(actId)+"/winners")||[];
+        if(winners.length<pol.firstN){ pushWinner_(actId,sap); points+=num(pol.firstNBonus); }
+      }
+    }
+    finalized=true;
+  }else{
+    points+=num(pol.base);
+    finalized=false;
+  }
+
+  appendSubmission_({ts:nowISO(),sap:sap,actId:actId,answer:answer,correct:correct,points:points,source:source||"web",category:act.Category,groupId:act.GroupId,finalized:finalized});
+  if(points>0){ writeUsersTotal_(sap,points,0); }
+
+  try{
+    var users=readUsers();
+    rtdbPut_("public/usersSummary",users);
+    var arr=[],k; for(k in users) if(users.hasOwnProperty(k)){ arr.push({sap:k,name:users[k].name||k,pts:num(users[k].pointsTotal)}); }
+    arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
+    rtdbPut_("public/leaderboard",arr.slice(0,20));
+  }catch(e){ log_("public_sync",String(e),{}); }
+
+  var out={ok:true,points:points,finalized:finalized};
+  if(reveal){ out.answerReveal=reveal; out.correct=(correct===true); }
+  return out;
+}
+
+/* ===== Redeem / Confirm (หุ้ม LockService กัน race) ===== */
+function redeemReward_(sap,rewardName){
+  var lock = LockService.getDocumentLock(); lock.waitLock(30000);
+  try{
+    if(!sap) throw new Error("sap required");
+    if(!rewardName) throw new Error("rewardName required");
+    var users=readUsers(); if(!users[sap]) throw new Error("SAP not found");
+    var rewards=readRewards(); if(!rewards[rewardName]) throw new Error("Reward not found");
+    var need=num(rewards[rewardName].pointsRequired);
+    if(num(users[sap].pointsTotal)<need) throw new Error("คะแนนไม่เพียงพอ");
+    if(num(rewards[rewardName].stock)<=0) throw new Error("ของรางวัลหมด");
+
+    var st=adjustRewardStock_(rewardName,-1);
+    var after=writeUsersTotal_(sap,0,need);
+    appendRedemption_(sap,rewardName,need,st.before,st.after,"แลกผ่านหน้าเว็บ");
+
+    try{
+      rtdbPut_("public/rewards",readRewards());
+      var users2=readUsers();
+      rtdbPut_("public/usersSummary",users2);
+      var arr=[],k; for(k in users2) if(users2.hasOwnProperty(k)){ arr.push({sap:k,name:users2[k].name||k,pts:num(users2[k].pointsTotal)}); }
+      arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
+      rtdbPut_("public/leaderboard",arr.slice(0,20));
+
+      var red=rtdbGet_("public/redemptions/"+sap)||[];
+      red.push({timestamp:nowISO(),sap:sap,rewardName:rewardName,points:need,status:"แลกผ่านหน้าเว็บ"});
+      rtdbPut_("public/redemptions/"+sap,red.slice(-100));
+    }catch(e){ log_("sync_after_redeem",String(e),{sap:sap,reward:rewardName}); }
+    return {ok:true,totalAfter:after.total,stockAfter:st.after};
+  } finally {
+    lock.releaseLock();
+  }
+}
+function confirmRedeem_(sap,rewardName,admin,ts,ptsFromClient){
+  var lock = LockService.getDocumentLock(); lock.waitLock(30000);
+  try{
+    if(!sap) throw new Error("sap required");
+    if(!rewardName) throw new Error("rewardName required");
+    if(!admin) throw new Error("admin required");
+
+    // ✅ QR validity = 10 minutes
+    if(!ts) throw new Error("QR ไม่ถูกต้อง (ไม่มีเวลา)");
+    var qrTime=new Date(ts).getTime();
+    if(!isFinite(qrTime)) throw new Error("เวลา QR ไม่ถูกต้อง");
+    if(Date.now()-qrTime > 10*60*1000) throw new Error("QR หมดอายุ (เกิน 10 นาที)");
+
+    var rewards=readRewards(), r=rewards[rewardName]; if(!r) throw new Error("Reward not found");
+    if(ptsFromClient && num(ptsFromClient)!==num(r.pointsRequired)) throw new Error("แต้มที่ต้องใช้ไม่ตรงกับระบบ");
+
+    var users=readUsers(), u=users[sap]; if(!u) throw new Error("SAP not found");
+    var need=num(r.pointsRequired);
+    if(num(u.pointsTotal)<need) throw new Error("คะแนนไม่เพียงพอ");
+    if(num(r.stock)<=0) throw new Error("ของรางวัลหมด");
+
+    var st=adjustRewardStock_(rewardName,-1);
+    var after=writeUsersTotal_(sap,0,need);
+    appendRedemption_(sap,rewardName,need,st.before,st.after,"ยืนยันโดยแอดมิน: "+admin);
+
+    try{
+      // sync public
+      rtdbPut_("public/rewards",readRewards());
+      var users2=readUsers(); rtdbPut_("public/usersSummary",users2);
+      var arr=[]; for(var k in users2) if(users2.hasOwnProperty(k)){ arr.push({sap:k,name:users2[k].name||k,pts:num(users2[k].pointsTotal)}); }
+      arr.sort(function(a,b){return num(b.pts)-num(a.pts);}); rtdbPut_("public/leaderboard",arr.slice(0,20));
+
+      var red=rtdbGet_("public/redemptions/"+sap)||[];
+      red.push({timestamp:nowISO(),sap:sap,rewardName:rewardName,points:need,status:"ยืนยันโดยแอดมิน: "+admin});
+      rtdbPut_("public/redemptions/"+sap,red.slice(-100));
+
+      // ✅ ส่ง ack แจ้งไปยัง user
+      rtdbPut_("public/redeemAck/"+sap,{
+        timestamp: nowISO(),
+        rewardName: rewardName,
+        points: need,
+        admin: admin,
+        message: "ได้รับรางวัลแล้ว"
+      });
+    }catch(e){ log_("confirm_sync_err",String(e),{sap:sap,reward:rewardName}); }
+
+    return {ok:true,totalAfter:after.total,stockAfter:st.after};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===== Snapshots & Triggers (Debounce ไม่กองคิว) ===== */
+function refreshSnapshotsSafe_(){
+  try{ refreshSnapshots(); }catch(e){ log_("refresh_err",String(e),{}); }
+}
+function scheduleSync_(){
+  var p=PROP(), now=Date.now(), next=now+15000;
+  var until=Number(p.getProperty("SYNC_LOCK_UNTIL")||"0");
+  if(next <= until) return;
+  p.setProperty("SYNC_LOCK_UNTIL", String(next));
+  ScriptApp.newTrigger("debouncedSync_").timeBased().at(new Date(next)).create();
+}
+function debouncedSync_(){
+  var lock=LockService.getScriptLock();
+  if(!lock.tryLock(10000)) return;
+  try{
+    var p=PROP(), until=Number(p.getProperty("SYNC_LOCK_UNTIL")||"0");
+    if(Date.now() < until-500) return;
+    refreshSnapshotsSafe_();
+  }catch(e){ log_("debouncedSync",String(e),{}); }
+  finally{ lock.releaseLock(); }
+}
+/** triggers */
+function onEdit(e){ try{ scheduleSync_(); }catch(err){ log_("onEdit",String(err),{}); } }
+function onChange(e){ try{ scheduleSync_(); }catch(err){ log_("onChange",String(err),{}); } }
+function onOpen(){ try{
+  SpreadsheetApp.getUi().createMenu("Sianes")
+    .addItem("Refresh RTDB","refreshSnapshots")
+    .addItem("Run Debounced Sync","scheduleSync_")
+    .addToUi();
+} catch(e){} }
+function setupTriggersOnce(){
+  var ts=ScriptApp.getProjectTriggers(), i;
+  for(i=0;i<ts.length;i++){
+    var fn=ts[i].getHandlerFunction();
+    if(fn==="onChange" || fn==="onEdit" || fn==="debouncedSync_" || fn==="onOpen" || fn==="timeBackupSync_"){
+      ScriptApp.deleteTrigger(ts[i]);
+    }
+  }
+  ScriptApp.newTrigger("onChange").forSpreadsheet(SPREADSHEET_ID).onChange().create();
+  ScriptApp.newTrigger("onEdit").forSpreadsheet(SPREADSHEET_ID).onEdit().create();
+  ScriptApp.newTrigger("timeBackupSync_").timeBased().everyMinutes(5).create();
+}
+function timeBackupSync_(){ try{ refreshSnapshotsSafe_(); }catch(e){ log_("timeBackupSync",String(e),{}); } }
