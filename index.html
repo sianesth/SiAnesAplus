@@ -4,68 +4,214 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>ANESA+ — User (latest)</title>
-<link rel="preconnect" href="https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
+<link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
 <style>
-  :root{ --bg:#f6f8fd;--card:#fff;--line:#e6e9f2;--txt:#0f1733;--muted:#6b78a6;--btn:#1f6fff;--danger:#d93025; --ok:#0a8c4a; }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0}
-  body{ font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--txt); }
-  header{ position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:12px; background:#0b1020; color:#fff; padding:10px 14px;}
-  header img{height:44px;width:auto}
-  .brand{display:flex;flex-direction:column;line-height:1.15}
-  .brand .sys{font-size:24px;font-weight:800;letter-spacing:.2px}
-  .brand .welcome{font-size:13px;color:#cdd4f0}
-  .spacer{flex:1}
-  #btnLogout{background:#1f6fff;color:#fff;border:none;border-radius:12px;padding:8px 14px;cursor:pointer;box-shadow:0 6px 16px rgba(31,111,255,.25);}  
-  main{max-width:980px;margin:0 auto;padding:14px;display:grid;gap:14px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 16px 16px;position:relative;}
-  .card>h3:first-child{position:absolute;top:-12px;left:16px;margin:0;padding:6px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;gap:6px;}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  input,button{border-radius:12px;border:1px solid var(--line);padding:10px 12px;font:inherit}
-  button{cursor:pointer;background:var(--btn);color:#fff;border-color:transparent}
-  button.ghost{background:#0f1733;color:#fff}
-  button[disabled]{background:#cfd7ff;color:#6570a0;cursor:not-allowed}
-  .muted{color:var(--muted)}
-  .pill{display:inline-block;background:#eef3ff;border-radius:999px;padding:6px 12px;margin-right:8px}
-  body.is-login{overflow:hidden}
-  #loginBox{display:flex;align-items:flex-start;justify-content:center;padding:12px}
-  .login-card{width:min(560px,92vw);background:#ffffffcc;border:1px solid var(--line);border-radius:18px;padding:20px 16px 16px;box-shadow:0 12px 30px rgba(0,0,0,.06);text-align:center}
-  .login-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 6px;display:block}
-  .login-title{font-weight:800;font-size:clamp(18px,3.6vw,24px);margin:2px 0}
-  .login-sub{margin:0 0 12px;color:#5f6ea5}
-  .login-row{display:flex;justify-content:center;gap:10px}
-  #sap{width:150px;text-align:center}
-  .reward{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
-  .reward img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#f4f6fb;border:1px solid var(--line)}
-  table{width:100%;border-collapse:collapse}
-  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left}
-  #qrModal,#actModal,#chooseModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);z-index:60}
-  #qrBox,#actBox,#chooseBox{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;max-width:640px;width:92vw}
-  .timer{font-variant-numeric:tabular-nums;font-size:22px}
-  .pill2{display:inline-block;background:#fff7e6;border:1px solid #ffd18a;color:#8a5300;border-radius:999px;padding:4px 10px}
-  .bad{color:var(--danger)}
-  .ok{color:var(--ok)}
-  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0c8c5f;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.18);opacity:0;transition:.25s;z-index:999}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
-  .latest{border:1px dashed var(--line); background:#f7f9ff; border-radius:10px; padding:10px; margin-bottom:10px;}
-  .latest b{font-weight:800}
-  .actrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
-  .actrow .flex1{flex:1;min-width:0}
-  .actrow .title{font-weight:700}
-  .actrow .sub{color:var(--muted);font-size:12px}
-  @media(max-width:520px){ header img{height:40px}.brand .sys{font-size:22px}.card>h3:first-child{font-size:14px;padding:5px 10px}#sap{width:130px}}
-  #actList{display:none!important}
+  /* ---------- ตัวแปรหลัก ---------- */
+  /* ========== Base variables ========== */
+:root{
+  --bg:#f6f8fd; --card:#fff; --line:#e6e9f2; --txt:#0f1733; --muted:#6b78a6;
+  --btn:#1f6fff; --danger:#d93025; --ok:#0a8c4a;
+  --header-h:64px;
 
-  /* จัดกึ่งกลางคอลัมน์แต้มของรายงานแบบสอบถามประจำปี */
-  #annualBox table th:last-child,
-  #annualBox table td:last-child { text-align: center; width: 90px; }
-  /* จัดกึ่งกลางคอลัมน์ ผลตอบ และ แต้ม ในรายงานกิจกรรมรายสัปดาห์ */
-  #weeklyBox table th:nth-child(3),
-  #weeklyBox table td:nth-child(3),
-  #weeklyBox table th:nth-child(4),
-  #weeklyBox table td:nth-child(4) { text-align: center; width: 90px; }
+  /* pastel/border for cards & KPI */
+  --bd:#e9eef7;
+  --shadow:0 6px 24px rgba(13,38,76,.06);
+
+  --kpi-total-bg:#eaf1ff; --kpi-total-bd:#d6e4ff; /* ฟ้าอ่อน */
+  --kpi-used-bg:#ffe9e9;  --kpi-used-bd:#ffd6d6;  /* ชมพูอ่อน */
+  --kpi-left-bg:#e9f8ee;  --kpi-left-bd:#d7f0de;  /* เขียวอ่อน */
+}
+
+/* ========== Reset / layout ========== */
+*{ box-sizing:border-box }
+html,body{ height:100%; margin:0 }
+body{
+  font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+  background:var(--bg); color:var(--txt);
+}
+
+/* ========== Header (fixed) ========== */
+header{
+  position:fixed; inset:0 auto auto 0; right:0; top:0;
+  z-index:1000; display:flex; align-items:center; gap:12px;
+  background:#1d3557; color:#fff; padding:10px 14px;
+}
+header img{ height:44px; width:auto }
+.brand{ display:flex; flex-direction:column; line-height:1.15 }
+.brand .sys{ font-size:24px; font-weight:800; letter-spacing:.2px }
+.brand .welcome{ font-size:13px; color:#cdd4f0 }
+.spacer{ flex:1 }
+
+/* Logout button (icon) */
+#btnLogout{
+  background:#1f6fff; color:#fff; border:none; border-radius:12px;
+  padding:8px 14px; cursor:pointer; box-shadow:0 6px 16px rgba(31,111,255,.25);
+}
+#btnLogout.icon-btn{
+  width:36px; height:36px; padding:0; display:inline-grid; place-items:center;
+  background:#fec89a; border-radius:12px; box-shadow:0 6px 16px rgba(31,111,255,.25);
+}
+#btnLogout.icon-btn svg{ width:20px; height:20px; fill:currentColor; }
+
+/* ========== Main container ========== */
+main{
+  max-width:980px; margin:0 auto;
+  padding:14px; display:grid; gap:18px;
+  margin-top:calc(var(--header-h) + 8px);
+}
+
+/* ========== Generic UI ========== */
+.row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+input,button{
+  border-radius:12px; border:1px solid var(--line);
+  padding:10px 12px; font:inherit;
+}
+button{ cursor:pointer; background:var(--btn); color:#fff; border-color:transparent }
+button.ghost{ background:#0f1733; color:#fff }
+button[disabled]{ background:#cfd7ff; color:#6570a0; cursor:not-allowed }
+.muted{ color:var(--muted) }
+.pill{ display:inline-block; background:#eef3ff; border-radius:999px; padding:6px 12px }
+
+/* ========== Card ========== */
+.card{
+  background:#fff; border:1px solid var(--bd); border-radius:16px;
+  box-shadow:var(--shadow); padding:16px; position:relative;
+}
+.card>h3:first-child{
+  position:static; margin:0 0 10px; padding:0;
+  border:0; background:transparent; border-radius:0;
+  font-size:16px; font-weight:800; display:flex; gap:8px; color:var(--txt);
+}
+
+/* ========== Rewards list ========== */
+.reward{
+  display:flex; gap:10px; align-items:center;
+  border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px;
+}
+.reward img{
+  width:56px; height:56px; border-radius:8px; object-fit:cover;
+  background:#f4f6fb; border:1px solid var(--line);
+}
+
+/* ========== Tables ========== */
+table{ width:100%; border-collapse:collapse }
+th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left }
+#annualBox table th:last-child,
+#annualBox table td:last-child{ text-align:center; width:90px }
+#weeklyBox table th:nth-child(3),
+#weeklyBox table td:nth-child(3),
+#weeklyBox table th:nth-child(4),
+#weeklyBox table td:nth-child(4){ text-align:center; width:90px }
+
+/* ========== Modals & toast ========== */
+#qrModal,#actModal,#chooseModal{
+  position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.5); z-index:60;
+}
+#qrBox,#actBox,#chooseBox{
+  background:#fff; border:1px solid var(--line); border-radius:12px;
+  padding:16px; max-width:640px; width:92vw;
+}
+.timer{ font-variant-numeric:tabular-nums; font-size:22px }
+.pill2{ display:inline-block; background:#fff7e6; border:1px solid #ffd18a; color:#8a5300; border-radius:999px; padding:4px 10px }
+.bad{ color:var(--danger) } .ok{ color:var(--ok) }
+.toast{
+  position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+  background:#0c8c5f; color:#fff; padding:10px 14px; border-radius:10px;
+  box-shadow:0 8px 22px rgba(0,0,0,.18); opacity:0; transition:.25s; z-index:999;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px) }
+.latest{ border:1px dashed var(--line); background:#f7f9ff; border-radius:10px; padding:10px; margin-bottom:10px }
+.latest b{ font-weight:800 }
+
+/* ========== Login page ========== */
+body.is-login{ overflow:hidden; }
+#loginBox{ display:flex; align-items:flex-start; justify-content:center; padding:12px }
+.login-card{
+  width:min(560px,92vw); text-align:center;
+  background:rgba(255,255,255,.86); border:1px solid rgba(255,255,255,.6);
+  border-radius:22px; box-shadow:0 20px 50px rgba(20,34,89,.12), 0 6px 18px rgba(20,34,89,.08);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  padding:26px 18px 20px;
+}
+.login-logo{ width:88px; height:88px; object-fit:contain; margin:0 auto 6px; display:block; animation:floaty 3.6s ease-in-out infinite }
+.login-title{ font-weight:800; font-size:clamp(18px,3.6vw,24px); margin:2px 0 }
+.login-sub{ margin:0 0 12px; color:#7a86b6 }
+.login-row{ display:flex; justify-content:center; gap:12px }
+#sap{ width:170px; height:42px; text-align:center; border-radius:999px; border:1px solid #e2e7fb; background:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.7) }
+#sap:focus{ outline:none; border-color:#b9c8ff; box-shadow:0 0 0 4px rgba(116,148,255,.22) }
+#btnLogin{
+  height:42px; border-radius:999px; border:none; padding:0 18px; font-weight:700; letter-spacing:.2px;
+  background:linear-gradient(135deg,#3b82f6,#6d28d9); box-shadow:0 10px 20px rgba(59,130,246,.25);
+}
+#btnLogin:hover{ transform:translateY(-1px); filter:brightness(1.03); box-shadow:0 12px 24px rgba(59,130,246,.3) }
+@keyframes floaty{ 0%,100%{ transform:translateY(-2px) } 50%{ transform:translateY(2px) } }
+
+/* ดันหน้า Login ลงจากเฮดเดอร์ (ปรับตัวเลขได้) */
+body.is-login main{ margin-top:calc(var(--header-h) + 140px) !important; } /* อยากลงมากขึ้น/น้อยลง ปรับ 120 */
+
+/* ========== KPI section ========== */
+#kpiBox{ padding-top:8px; }
+#kpiBox > h3{ margin:0 0 6px; }
+#kpiBox .kpiRow{
+  display:flex; align-items:center; gap:12px; margin-top:2px;
+}
+.kpi{
+  min-width:136px; padding:10px 14px; text-align:center;
+  border:1px solid var(--line); border-radius:12px;
+  box-shadow:inset 0 2px 8px rgba(15,23,51,.05);
+}
+.kpi .label{ display:block; font-size:12px; line-height:1.2; color:var(--muted); margin-bottom:2px }
+.kpi .value{ display:block; font-size:22px; font-weight:800; line-height:1 }
+
+/* KPI colors */
+.kpi.is-total{ background:var(--kpi-total-bg); border-color:var(--kpi-total-bd); color:#1f4b99 }
+.kpi.is-used { background:var(--kpi-used-bg);  border-color:var(--kpi-used-bd);  color:#9c2a2a }
+.kpi.is-left { background:var(--kpi-left-bg);  border-color:var(--kpi-left-bd);  color:#0a6b3d }
+
+/* Top 20 button */
+#kpiBox #btnTop20{
+  margin-left:auto; font-size:13px; padding:6px 10px; border-radius:10px;
+  background:#1f6fff; color:#fff; border:none; white-space:nowrap;
+  box-shadow:0 4px 12px rgba(31,111,255,.18);
+}
+
+/* ========== Responsive ========== */
+@media (max-width:720px){
+  #kpiBox .kpiRow{ flex-wrap:wrap }
+  #kpiBox #btnTop20{ order:4 } /* ลงบรรทัดใหม่ท้ายสุดเมื่อแคบ */
+}
+@media (max-width:520px){
+  header img{ height:40px }
+  .brand .sys{ font-size:22px }
+  #sap{ width:150px; height:40px }
+  #btnLogin{ height:40px; padding:0 16px }
+  .login-logo{ width:80px; height:80px }
+  .kpi{ min-width:120px; padding:8px 10px }
+  .kpi .value{ font-size:20px }
+  #btnLogout.icon-btn{ width:32px; height:32px; border-radius:10px }
+  #btnLogout.icon-btn svg{ width:18px; height:18px }
+}
+
+/* ---- Fix: เว้นระยะหัวกับกล่องล็อกอิน ---- */
+body.is-login main{
+  /* ดันลงจากเฮดเดอร์อีก 24px */
+  margin-top: calc(var(--header-h) + 8px) !important;
+}
+
+body.is-login #loginBox{
+  /* กันชนเผื่อไว้ เพิ่ม padding-top ภายใน section */
+  padding-top: 16px !important;
+}
+
+body.is-login .login-card{
+  /* กัน CSS อื่นทับค่า: ถ้ายังชิดอยู่ ให้การ์ดมีระยะเองด้วย */
+  margin-top: 48px !important;
+}
+
 </style>
+
 </head>
 <body class="is-login">
 <header>
@@ -75,7 +221,14 @@
     <div id="welcomeText" class="welcome" style="display:none">ยินดีต้อนรับคุณ —</div>
   </div>
   <div class="spacer"></div>
-  <button id="btnLogout" class="ghost" style="display:none">ออกจากระบบ</button>
+  <button id="btnLogout" class="icon-btn" title="ออกจากระบบ" aria-label="ออกจากระบบ" style="display:none">
+  <!-- ไอคอน logout แบบ SVG -->
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M10 3a1 1 0 0 0-1 1v4h2V6h8v12h-8v-2H9v4a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H10z"/>
+    <path d="M13 12a1 1 0 0 0-1-1H5.41l1.3-1.29A1 1 0 1 0 5.3 7.3l-3 3a1 1 0 0 0 0 1.41l3 3a1 1 0 1 0 1.41-1.41L5.41 13H12a1 1 0 0 0 1-1z"/>
+  </svg>
+</button>
+
 </header>
 
 <main>
@@ -95,14 +248,22 @@
 
   <!-- KPI + Top20 -->
   <section id="kpiBox" class="card" style="display:none">
-    <h3>📊 คะแนนสะสมของคุณ</h3>
-    <div class="row" style="align-items:center">
-      <span class="pill">รวมทั้งหมด <b id="uEarned">0</b></span>
-      <span class="pill">ใช้ไปแล้ว <b id="uUsed">0</b></span>
-      <span class="pill">คงเหลือ <b id="uTotal">0</b></span>
-      <span class="spacer"></span>
-      <button id="btnTop20">🏆 ดู Top 20</button>
+    <h3>📊 แต้มสะสมของคุณ</h3>
+    <div class="kpiRow row">
+      <div class="kpi is-total">
+      <span class="label">รวมทั้งหมด</span>
+      <span class="value" id="uEarned">0</span>
     </div>
+    <div class="kpi is-used">
+      <span class="label">ใช้ไปแล้ว</span>
+      <span class="value" id="uUsed">0</span>
+    </div>
+    <div class="kpi is-left">
+      <span class="label">คงเหลือ</span>
+      <span class="value" id="uTotal">0</span>
+    </div>
+    <button id="btnTop20">🏆Top 20</button>
+  </div>
   </section>
 
   <!-- Today / Activities -->
@@ -112,7 +273,7 @@
     <div id="actTodayInfo" class="muted" style="display:none"></div>
     <div class="row" style="margin-top:8px">
       <button id="btnActNow">คำถามตอนนี้</button>
-      <button id="btnWinners">Top 20 ผู้ตอบถูก (วันนี้)</button>
+      <button id="btnWinners">Top 20 ถูกและเร็ว (วันนี้)</button>
     </div>
     <div id="actList" style="margin-top:10px;display:none"></div>
   </section>
@@ -120,8 +281,7 @@
   <!-- Rewards -->
   <section id="rewardsBox" class="card" style="display:none">
     <h3>🎁 ของรางวัลที่แลกได้</h3>
-    <div class="muted" style="margin:-6px 0 8px">อัปเดตอัตโนมัติ (realtime)</div>
-    <div id="rewards"></div>
+     <div id="rewards"></div>
     <div id="lockBanner" class="muted" style="margin-top:6px;display:none">
       <span>มี QR รอการยืนยัน — หมดอายุใน <b class="timer" id="bannerTimer">10:00</b></span>
       <button class="ghost" id="bannerShow" style="margin-left:8px">เปิด QR</button>
@@ -221,66 +381,59 @@
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล
 </footer>
 
-<!-- ====== (ใหม่) URL + ฟังก์ชันส่งเข้า Sheet (global) ====== -->
-<script>
-  // URL ของ Web App (ลงท้าย /exec)
-  window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxM9jUAMMxeYe-6ia6lMsh4mTYiaye0mc16LesfMBN3HTcRFIBEjnMRUQaRZDejDabLg/exec";
-
-  // ส่งเข้า Google Sheet: เลือกโหมดตามสภาพแวดล้อมอัตโนมัติ
-  window.postSubmissionToSheet = async function(payload){
-    payload = payload || {};
-    if (!payload.action)    payload.action    = 'submitanswer';
-    if (!payload.timestamp) payload.timestamp = new Date().toISOString();
-    if (!payload.client)    payload.client    = (location.protocol === 'file:' ? 'file-mode' : 'web-anesa+');
-
-    const isFile = (location.protocol === 'file:'); // เปิดจาก Notepad/Explorer
-
-    try{
-      const res = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        ...(isFile ? { mode:'no-cors' } : {}),
-        body: JSON.stringify(payload)
-        // ไม่ใส่ headers เพื่อเลี่ยง preflight
-      });
-
-      // โหมด file:/// อ่านผลตอบกลับไม่ได้ แต่ส่งถึง Apps Script
-      if (isFile) return true;
-
-      // โหมดเว็บไซต์จริง: อ่านผล JSON จาก Apps Script ได้
-      const data = await res.json();
-      return data; // { ok:true, correct:'TRUE|FALSE|PENDING', points:... }
-    }catch(e){
-      // สำรอง: พยายามส่งด้วย sendBeacon
-      try{
-        const ok = navigator.sendBeacon?.(
-          SCRIPT_URL,
-          new Blob([JSON.stringify(payload)], { type:'text/plain' })
-        );
-        return isFile ? !!ok : { ok: !!ok };
-      }catch(_){
-        console.error('submit failed:', e);
-        return isFile ? false : { ok:false, error:String(e) };
-      }
-    }
-  };
-</script>
-
-<!-- ====== โมดูลหลัก (Firebase + UI + logic) ====== -->
 <script type="module">
 /* ========= Config ========= */
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
 const { getDatabase, ref, onValue, get, off, child } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
 const app = initializeApp({
-  apiKey: "AIzaSyCMTpAce-Q-fTkS7xDDYuEpPwgtBIrDP04",
-  authDomain: "anespoint-bfd3d.firebaseapp.com",
-  databaseURL: "https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "anespoint-bfd3d",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyAiSW2d16RpHjtUR7OIl2PVpvH_QPL3cp4",
+  authDomain: "anesaplus.firebaseapp.com",
+  databaseURL: "https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anesaplus",
+  appId: "1:518123966097:web:2f93eeb56ec026aa903930"
 });
 
 // Endpoints
-const DB_URL = "https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app";
-const ADMIN_PAGE_URL = "https://sianesth.github.io/AnesQD-Reward/"; 
+const DB_URL = "https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app";
+const ADMIN_PAGE_URL = "https://sianesth.github.io/Admin_reward/"; 
+// ⬇️ IMPORTANT: อัปเดตเป็น URL ของ Web App (Deployment ล่าสุด) ลงท้ายด้วย /exec
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDO2uXrgEAk3Uq9KPNpihQeMJzZWrS45nTkgjO8ZgsGErisAvHAICCKy6MCFUz935L/exec';
+
+async function postSubmissionToSheet(payload) {
+  const url = SCRIPT_URL;
+  if (!url) return { ok: false, error: 'SCRIPT_URL missing' };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      keepalive: false,
+      cache: 'no-store'
+    });
+    const data = await res.json();
+
+    // ✅ แสดงผลได้ทันที
+    if (data.ok && data.correct) {
+      if (data.correct === "TRUE") {
+        showAnswerResult(true, data.points);
+      } else if (data.correct === "FALSE") {
+        showAnswerResult(false, 0);
+      } else {
+        showAnswerResult(null, 0);
+      }
+    }
+
+    // ⬅️ รองรับ error USER_NON_ACTIVE จาก server
+    if (data && data.error === 'USER_NON_ACTIVE') {
+      toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
+    }
+
+    return data || { ok: true, correct: 'PENDING', points: null };
+  } catch (e) {
+    console.error('Submit error:', e);
+    return { ok: false, error: String(e) };
+  }
+}
 
 /* ========= Tiny helpers ========= */
 const $ = q => document.querySelector(q);
@@ -291,10 +444,18 @@ function setWelcome(name){const el=$('#welcomeText'); if(name){ el.textContent='
 function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function todayKey(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
 
-// Google Drive image helpers (deduped)
+// Google Drive image helpers
 function extractId(u){ const s=String(u||""); if(!s) return ""; const m = s.match(/\/d\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/); return m&&m[1]?m[1]:""; }
 function fixImg(u){ const s=String(u||'').trim(); if(!s) return ''; if(/uc\?export=view&id=/.test(s)) return s; const id=extractId(s); return id ? `https://drive.google.com/uc?export=view&id=${id}` : s; }
 function driveThumb(id){ return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w300` : ''; }
+
+/* ========= Header offset (fixed header space) ========= */
+function applyHeaderOffset(){
+  const h = document.querySelector('header')?.offsetHeight || 0;
+  document.documentElement.style.setProperty('--header-h', h + 'px');
+}
+window.addEventListener('load', applyHeaderOffset);
+window.addEventListener('resize', applyHeaderOffset);
 
 /* ========= Session ========= */
 const SESSION_KEY = 'anes.session.v1';
@@ -337,8 +498,18 @@ $('#btnLogin').onclick=async ()=>{
   $('#loginMsg').textContent='กำลังตรวจสอบ...';
   let u=null; try{ u=await fetchUserQuick(s); }catch{}
   if(!u){ $('#loginMsg').innerHTML='ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin'; return; }
-  const raw=(u?.Status ?? u?.status ?? u?.Active ?? 'Active');
-  const ok=!raw ? true : ['active','true','1','เปิด','ใช้งาน','enabled','on','yes'].includes(String(raw).trim().toLowerCase());
+  // normalize สถานะให้เท่ากันกับฝั่ง Apps Script
+  function isActiveStatus(val){
+    const s = String(val ?? '').normalize('NFKC').trim().toLowerCase();
+    if(!s) return true; // ว่าง = ถือว่า active
+    if (/^(inactive|non-?active|disabled?|false|0|ปิด|งด|หยุด)$/i.test(s)) return false;
+    if (/^(active|true|1|เปิด|ใช้งาน|enabled?|on|yes)$/i.test(s)) return true;
+    // fallback: ถ้าไม่ได้ขึ้นต้นด้วย "non" ก็ถือว่า active
+    return !(s.startsWith('non'));
+  }
+  const raw = (u?.active ?? u?.Status ?? u?.status ?? u?.Active ?? 'Active');
+  const ok  = (typeof u?.active === 'boolean') ? u.active : isActiveStatus(raw);
+
   if(!ok){ $('#loginMsg').innerHTML='สถานะ <b>Non-active</b> • กรุณาติดต่อผู้ดูแลระบบ'; return; }
 
   state.sap=s; state.name=((u && (u.name||u.Name)) || s); setWelcome(state.name);
@@ -372,6 +543,12 @@ function loadWeekly(){ try{ return JSON.parse(localStorage.getItem(weeklyKey())|
 function saveWeekly(arr){ localStorage.setItem(weeklyKey(), JSON.stringify(arr)); }
 function addOrUpdateWeekly(e){ const arr=loadWeekly(); const i=arr.findIndex(x=>x.dateISO===e.dateISO && String(x.actId||'')===String(e.actId||'')); if(i>=0) arr[i]={...arr[i],...e}; else arr.push(e); saveWeekly(arr); renderWeekly(); }
 function thisWeekRange(){ const d=new Date(); const day=(d.getDay()+6)%7; const start=new Date(d); start.setHours(0,0,0,0); start.setDate(d.getDate()-day); const end=new Date(start); end.setDate(start.getDate()+7); return [start,end]; }
+
+/* ========= “ยกเลิกตีตราตอบแล้ว” กรณีถูกปฏิเสธ ========= */
+function aKey(id){ return `anes.act.answered.${id}.${todayKey()}.${state.sap||'0'}`; }
+function unmarkAns(id){ try{ localStorage.removeItem(aKey(id)); }catch{} }
+function clinPairStoreKey(key){ return `anes.group.clinpair.${key}.${todayKey()}.${state.sap||'0'}`; }
+function unmarkClinPair(key){ try{ localStorage.removeItem(clinPairStoreKey(key)); }catch{} }
 
 function renderWeekly(){
   const [wStart, wEnd]=thisWeekRange();
@@ -442,14 +619,9 @@ function renderAnnual(){
 function parseLocal(s){ if(!s) return NaN; let t=String(s).trim(); t=t.replace(/([+\-]\d{2}):?(\d{2})$/, (m,hh,mm)=>{ const ok=['00','30','45']; return `${hh}:${ok.includes(mm)?mm:'00'}`; }).replace(/([+\-])(\d)(?=:)/,(_,sign,d)=>`${sign}0${d}`); if(/^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/.test(t)){ const ts=new Date(t.replace(' ','T')).getTime(); if(!Number.isNaN(ts)) return ts; } const ts2=new Date(t).getTime(); if(!Number.isNaN(ts2)) return ts2; const m=t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/); if(m){ const y=Number(m[3])<100?2000+Number(m[3]):Number(m[3]); const mm=Number(m[2])-1; const dd=Number(m[1]); const hh=Number(m[4]||0); const mi=Number(m[5]||0); return new Date(y,mm,dd,hh,mi).getTime(); } return NaN; }
 function isIn(st,en){ const now=Date.now(); const a=parseLocal(st); const b=parseLocal(en); if(Number.isNaN(a)&&Number.isNaN(b)) return true; if(Number.isNaN(a)) return now<=b; if(Number.isNaN(b)) return now>=a; const start=Math.min(a,b); const end=Math.max(a,b); return now>=start && now<=end; }
 function isTodayLocal(str){ const t=parseLocal(str); if(Number.isNaN(t)) return false; const d=new Date(t), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
-function aKey(id){ return `anes.act.answered.${id}.${todayKey()}.${state.sap||'0'}`; }
-function markAns(id){ localStorage.setItem(aKey(id),'1'); }
 function hasAns(id){ if(!id) return false; if(localStorage.getItem(aKey(id))) return true; const x=state.lastSubmission; if(!x) return false; const same=String(x.actId||'')===String(id||''); const ts=x.ts||x.timestamp; if(!ts) return false; const d=new Date(ts), n=new Date(); return same && d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
 function titleClinType(t){ const s=String(t||'').toLowerCase(); if(/\bnon[-\s]?clinical\b/.test(s) || /(non[-\s]?clinical)/i.test(t)) return 'nonclin'; if(/\bclinic\b/.test(s) || /\bclinical\b/.test(s) || /(clinic)/i.test(t)) return 'clin'; return null; }
 function pairKeyOf(a){ const g=a.GroupId||a.groupId||''; const t=a.Title||a.Question||''; const tag=titleClinType(t); return (g && tag)?String(g):null; }
-function clinPairStoreKey(key){ return `anes.group.clinpair.${key}.${todayKey()}.${state.sap||'0'}`; }
-function markClinPair(key){ if(!key) return; localStorage.setItem(clinPairStoreKey(key),'1'); }
-function clinPairAnswered(key){ if(!key) return false; return !!localStorage.getItem(clinPairStoreKey(key)); }
 
 /* ========= Preload activities for titles ========= */
 let _allActsLoaded=false;
@@ -523,16 +695,36 @@ $('#btnTop20').onclick = async () => {
     const FB = await ensureFirebase();
     const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
     const users = snap.val() || {};
-    const arr = Object.values(users).map(u => {
-      const name = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
-      const total = Number(u.PointsTotal ?? u.pointsTotal ?? (Number(u.PointsEarned ?? u.pointsEarned ?? 0) - Number(u.PointsUsed ?? u.pointsUsed ?? 0))) || 0;
+
+    // คำนวณอันดับจากคะแนนรวม แต่ "ไม่แสดงคะแนน"
+    const top = Object.values(users).map(u => {
+      const name  = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
+      const total = Number(
+        u.PointsTotal ?? u.pointsTotal ??
+        (Number(u.PointsEarned ?? u.pointsEarned ?? 0) - Number(u.PointsUsed ?? u.pointsUsed ?? 0))
+      ) || 0;
       return { name, total };
     }).sort((a,b) => b.total - a.total).slice(0,20);
-    $('#dlgTopTitle').textContent='Top 20 คะแนนสะสม';
-    $('#dlgTopBody').innerHTML = arr.length ? arr.map((r,i)=> `#${i+1} ${escapeHtml(r.name)} — ${fmt(r.total)} แต้ม`).join('<br>') : '—';
+
+    // เรนเดอร์ตาราง 2 คอลัมน์: ลำดับ, ชื่อ-นามสกุล
+    const cols = ['ลำดับ','ชื่อ-นามสกุล'];
+    const rows = top.map((r,i) => [String(i+1), String(r.name || '-')]);
+
+    const thead = `<thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${
+      rows.map(r => `<tr>${
+        r.map((c,i) => `<td${i===0 ? ' style="width:80px;text-align:center"' : ''}>${escapeHtml(c)}</td>`).join('')
+      }</tr>`).join('')
+    }</tbody>`;
+
+    $('#dlgTopTitle').textContent = 'Top 20 คะแนนสะสม';
+    $('#dlgTopBody').innerHTML = `<table style="width:100%;border-collapse:collapse">${thead}${tbody}</table>`;
     $('#dlgTop').showModal();
   } catch (e) {
-    console.error(e); $('#dlgTopTitle').textContent='Top 20 คะแนนสะสม'; $('#dlgTopBody').textContent='—'; $('#dlgTop').showModal();
+    console.error(e);
+    $('#dlgTopTitle').textContent = 'Top 20 คะแนนสะสม';
+    $('#dlgTopBody').textContent = '—';
+    $('#dlgTop').showModal();
   }
 };
 
@@ -556,16 +748,16 @@ function isTodayAct(a){ const k=todayKey(); const gd=groupDate(a); if(gd) return
 
 function pickAct(){
   const list=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{});
-  const cand=list.filter(a=>{ const active=String((a.Active==null?'TRUE':a.Active)).toLowerCase()!=='false'; if(!active) return false; const id=a.ActID||a.id||a.actId; if(!id) return false; if(!isTodayAct(a)) return false; if(hasAns(id)) return false; if(!isIn(a.WindowStart,a.WindowEnd)) return false; const pk=pairKeyOf(a); if(pk && clinPairAnswered(pk)) return false; return true; }).sort((x,y)=>parseLocal(x.WindowStart)-parseLocal(y.WindowStart));
+  const cand=list.filter(a=>{ const active=String((a.Active==null?'TRUE':a.Active)).toLowerCase()!=='false'; if(!active) return false; const id=a.ActID||a.id||a.actId; if(!id) return false; if(!isTodayAct(a)) return false; if(hasAns(id)) return false; if(!isIn(a.WindowStart,a.WindowEnd)) return false; const pk=pairKeyOf(a); if(pk && localStorage.getItem(clinPairStoreKey(pk))) return false; return true; }).sort((x,y)=>parseLocal(x.WindowStart)-parseLocal(y.WindowStart));
   if(!cand.length) return null;
   const byPair={}; cand.forEach(a=>{ const pk=pairKeyOf(a); if(!pk) return; (byPair[pk]=byPair[pk]||[]).push(a); });
-  const pair=Object.entries(byPair).find(([pk,arr])=> arr.length>=2 && !clinPairAnswered(pk));
+  const pair=Object.entries(byPair).find(([pk,arr])=> arr.length>=2 && !localStorage.getItem(clinPairStoreKey(pk)));
   if(pair){ const list2=pair[1].slice(0,2).sort((x,y)=>parseLocal(x.WindowStart)-parseLocal(y.WindowStart)); return { twoStep:'clinPair', list:list2 }; }
   return cand[0];
 }
 
 function autoOpenOnceIfAvailable(force=false){ if(!state.sap || actOpen) return; const pick=pickAct(); if(!pick){ scheduleAutoPopup(); return; } const id= pick.twoStep==='clinPair' ? ('GROUP:'+pairKeyOf(pick.list[0])) : (pick.ActID||pick.id||pick.actId); const key=`anes.autopopup.${todayKey()}.${id}`; if(!force && sessionStorage.getItem(key)) return; sessionStorage.setItem(key,'1'); if(pick.twoStep==='clinPair') openActSelector(pick); else openAct(pick); }
-function scheduleAutoPopup(){ clearTimeout(_autoTimer); if(!state.sap) return; const now=Date.now(); const upcoming=getTodayActs().filter(a=>{ const id=a.ActID||a.id||a.actId; if(!id) return false; if(hasAns(id)) return false; const pk=pairKeyOf(a); if(pk && clinPairAnswered(pk)) return false; const st=parseLocal(a.WindowStart); return !Number.isNaN(st) && st>now; }).sort((a,b)=> parseLocal(a.WindowStart)-parseLocal(b.WindowStart)); if(!upcoming.length) return; const when=Math.max(250, parseLocal(upcoming[0].WindowStart)-now+200); _autoTimer=setTimeout(()=> autoOpenOnceIfAvailable(), when); }
+function scheduleAutoPopup(){ clearTimeout(_autoTimer); if(!state.sap) return; const now=Date.now(); const upcoming=getTodayActs().filter(a=>{ const id=a.ActID||a.id||a.actId; if(!id) return false; if(hasAns(id)) return false; const pk=pairKeyOf(a); if(pk && localStorage.getItem(clinPairStoreKey(pk))) return false; const st=parseLocal(a.WindowStart); return !Number.isNaN(st) && st>now; }).sort((a,b)=> parseLocal(a.WindowStart)-parseLocal(b.WindowStart)); if(!upcoming.length) return; const when=Math.max(250, parseLocal(upcoming[0].WindowStart)-now+200); _autoTimer=setTimeout(()=> autoOpenOnceIfAvailable(), when); }
 window.addEventListener('focus', ()=> autoOpenOnceIfAvailable());
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoOpenOnceIfAvailable(); });
 function getTodayActs(){ const l=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{}); return l.filter(isTodayAct); }
@@ -573,6 +765,58 @@ function getTodayActs(){ const l=Array.isArray(state.activities)? state.activiti
 /* ========= Winners ========= */
 function currentActForWinners(){ const acts=getTodayActs().slice().sort((a,b)=>(parseLocal(a.WindowStart)||0)-(parseLocal(b.WindowStart)||0)); if(!acts.length) return null; if(state.lastSubmission && acts.some(a=>(a.ActID||a.id||a.actId)===state.lastSubmission.actId)){ return acts.find(a=>(a.ActID||a.id||a.actId)===state.lastSubmission.actId); } const inwin=acts.find(a=> isIn(a.WindowStart,a.WindowEnd)); return inwin || acts[0]; }
 async function readJson(path){ try{ const r=await fetch(`${DB_URL}/${path}.json?t=${Date.now()}`,{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }catch{ return null; } }
+async function fetchWinnersTable(today, actId){
+  const paths = [
+    actId ? `public/winnersByDate/${today}/${encodeURIComponent(actId)}` : null,
+    `public/winnersByDate/${today}`
+  ].filter(Boolean);
+
+  for (const p of paths){
+    const data = await readJson(p);
+    if (!data) continue;
+
+    // รูปแบบใหม่: มี __table
+    if (data.__table && Array.isArray(data.__table.rows)){
+      // map แค่ 2 คอลัมน์แรก: อันดับ, ชื่อ-นามสกุล
+      const rows = data.__table.rows.map(r => [ String(r[0] ?? ''), String(r[1] ?? '') ]);
+      return { cols:['อันดับ','ชื่อ-นามสกุล'], rows };
+    }
+
+    // รูปแบบใหม่อีกแบบ: __list = [{rank,sap,name,ts}]
+    if (Array.isArray(data.__list)){
+      const rows = data.__list.map(x => [
+        String(x.rank ?? ''),
+        String(x.name ?? x.sap ?? '-')
+      ]);
+      return { cols:['อันดับ','ชื่อ-นามสกุล'], rows };
+    }
+
+    // ของเดิม: object ต่อ SAP { sap, name, ts }
+    const items = Object.entries(data)
+      .filter(([k]) => !k.startsWith('__'))
+      .map(([,v]) => v)
+      .filter(Boolean)
+      .sort((a,b) => new Date(a.ts||a.timestamp||0) - new Date(b.ts||b.timestamp||0));
+
+    if (items.length){
+      const seen = new Set(), rows=[];
+      for (const it of items){
+        const sap = String(it.sap || it.SAP || '');
+        if (!sap || seen.has(sap)) continue;
+        seen.add(sap);
+        rows.push([
+          String(rows.length+1),
+          String(it.name || sap)
+        ]);
+        if (rows.length >= 20) break;
+      }
+      return { cols:['อันดับ','ชื่อ-นามสกุล'], rows };
+    }
+  }
+
+  return { cols:['อันดับ','ชื่อ-นามสกุล'], rows:[] };
+}
+
 async function loadTop20Winners(today, actId){
   const paths=[ actId?`public/winnersByDate/${today}/${encodeURIComponent(actId)}`:null, `public/winnersByDate/${today}` ].filter(Boolean);
   for(const p of paths){ const data=await readJson(p); if(!data) continue; if(typeof data==='object'){ const arr=Object.values(data).flatMap(v=> Object.values(v||{})); if(arr.length){ arr.sort((a,b)=> new Date(a.ts||a.timestamp||0) - new Date(b.ts||b.timestamp||0)); const seen=new Set(); const out=[]; for(const it of arr){ const sap=it.sap||it.SAP; if(!sap || seen.has(sap)) continue; seen.add(sap); out.push({ sap:String(sap), ts: it.ts||it.timestamp||null }); if(out.length>=20) break; } return out; } }
@@ -580,11 +824,29 @@ async function loadTop20Winners(today, actId){
   return [];
 }
 
-$('#btnWinners').onclick= async ()=>{
-  const today=todayKey(); const act=currentActForWinners(); const actId=act ? (act.ActID||act.id||act.actId) : null; const actTitle=act ? (act.Title||act.Question||actId||'') : '';
-  $('#dlgTopTitle').textContent = actTitle ? `Top 20 ผู้ตอบถูก (วันนี้) — ${actTitle}` : 'Top 20 ผู้ตอบถูก (วันนี้)';
-  const winners=await loadTop20Winners(today, actId);
-  if(winners.length){ $('#dlgTopBody').innerHTML = winners.slice(0,20).map((row,i)=> `#${i+1} SAP ${escapeHtml(row.sap)}${row.ts?` <span class="muted">(${escapeHtml(String(row.ts).replace('T',' ').slice(0,19))})</span>`:''}`).join('<br>'); } else { $('#dlgTopBody').textContent='—'; }
+$('#btnWinners').onclick = async () => {
+  const today = todayKey();
+  const act   = currentActForWinners();
+  const actId = act ? (act.ActID||act.id||act.actId) : null;
+  const actTitle = act ? (act.Title||act.Question||actId||'') : '';
+
+  $('#dlgTopTitle').textContent = actTitle
+    ? `Top 20 ผู้ตอบถูก (วันนี้) — ${actTitle}`
+    : 'Top 20 ผู้ตอบถูก (วันนี้)';
+
+  const table = await fetchWinnersTable(today, actId);
+
+  if (table.rows && table.rows.length){
+    const thead = `<thead><tr>${table.cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${
+      table.rows.map(r=>`<tr>${
+        r.map((c,i)=> `<td${i===0? ' style="width:80px;text-align:center"':''}>${escapeHtml(String(c))}</td>`).join('')
+      }</tr>`).join('')
+    }</tbody>`;
+    $('#dlgTopBody').innerHTML = `<table style="width:100%;border-collapse:collapse">${thead}${tbody}</table>`;
+  } else {
+    $('#dlgTopBody').innerHTML = '—';
+  }
   $('#dlgTop').showModal();
 };
 
@@ -615,6 +877,7 @@ function openAct(act){
   if (_submitting) return;
   _submitting = true;
   try {
+    // กันตอบซ้ำ (client)
     const id = act.ActID || act.id || act.actId;
     const t  = String(act.InputType || 'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
     if (hasAns(id)) {
@@ -622,6 +885,7 @@ function openAct(act){
       return;
     }
 
+    // คำตอบ
     let ans;
     if (['NUM2','NUM','NUMBER','NUMERIC','TEXT'].includes(t)) {
       ans = ($('#actText').value || '').trim();
@@ -636,27 +900,22 @@ function openAct(act){
       ans = String(chk.value || '').trim().toUpperCase();
     }
 
-    markAns(id);
-    const pk = pairKeyOf(act); if (pk) markClinPair(pk);
+    // ตีตร้าว่าตอบแล้ว (optimistic)
+    localStorage.setItem(aKey(id),'1');
+    const pk = pairKeyOf(act); if (pk) localStorage.setItem(clinPairStoreKey(pk),'1');
     localStorage.setItem('anes.act.lastAns.' + id + '.' + (state.sap || ''), ans);
 
+    // payload
     const key = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
     const ts  = new Date().toISOString();
     const payload = { sap: state.sap, actId: id, answer: ans, timestamp: ts, client: 'web-anesa+' };
 
+    // Optimistic UI (เฉพาะ MCQ ที่มีเฉลย)
     const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
     const hasAnswer = String(act.Answer || '').trim() !== '';
     const instantOK = (!isNumeric && hasAnswer) ? clientIsCorrect(act, ans) : null;
     const instantPts = (instantOK === true) ? (Number(act.BasePoints||0) + Number(act.CorrectBonus||0)) : 0;
-    const optimistic = {
-      actId: id,
-      title: (act.Title || id),
-      ts: ts,
-      correct: instantOK,
-      points: (instantOK === true ? instantPts : 0),
-      userAnswer: ans,
-      Finalized: false
-    };
+    const optimistic = { actId: id, title: (act.Title || id), ts, correct: instantOK, points: (instantOK ? instantPts : 0), userAnswer: ans, Finalized: false };
     state.lastSubmission = optimistic;
     renderLatest(optimistic);
     addOrUpdateWeekly({ dateISO: ts, title: optimistic.title, actId: id, result: optimistic.correct, points: optimistic.points, Finalized: false });
@@ -667,7 +926,7 @@ function openAct(act){
     $('#btnActNow').disabled = true;
     checkActivity();
 
-    // ส่งเข้าคิว RTDB (no-preflight)
+    // PUT queue → RTDB
     try {
       await fetch(DB_URL + '/public/answersQueue/' + encodeURIComponent(key) + '.json', {
         method: 'PUT',
@@ -676,7 +935,7 @@ function openAct(act){
       });
     } catch(_) {}
 
-    // ให้ Apps Script ประมวลผลคิว + บันทึก + บวกแต้ม
+    // Apps Script: queue:process
     let server = null;
     try{
       const r = await fetch(SCRIPT_URL, {
@@ -686,6 +945,19 @@ function openAct(act){
       server = await r.json();
     }catch(_){}
 
+    // ⬅️ จัดการกรณีถูกปฏิเสธเพราะ Non-active
+    if (server && server.error === 'USER_NON_ACTIVE') {
+      toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
+      // ยกเลิกตีตราว่าตอบแล้ว
+      unmarkAns(id);
+      const pk2 = pairKeyOf(act); if (pk2) unmarkClinPair(pk2);
+      // รีเฟรชปุ่ม
+      $('#btnActNow').disabled = false;
+      checkActivity();
+      return;
+    }
+
+    // ถ้าสำเร็จ → อัปเดตผล
     if (server && server.ok) {
       const final = {
         actId: id,
@@ -700,20 +972,25 @@ function openAct(act){
       renderLatest(final);
       addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: final.Finalized });
     } else {
-      // Fallback: ยิงตรงไป Apps Script (ฟังก์ชัน global จะจัดการโหมด file:/// ให้)
-      window.postSubmissionToSheet(payload).then((res)=>{
-        if (res && res.ok){
-          const final = {
-            actId: id, title: optimistic.title, ts: ts,
-            correct: (res.correct === 'TRUE' ? true : (res.correct === 'FALSE' ? false : null)),
-            points: (res.points == null ? 0 : Number(res.points)),
-            userAnswer: ans, Finalized: true
-          };
-          state.lastSubmission = final;
-          renderLatest(final);
-          addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: true });
-        }
-      }).catch(()=>{});
+      // fallback → ยิง submit ตรง
+      const res = await postSubmissionToSheet(payload);
+      if (res && res.error === 'USER_NON_ACTIVE') {
+        toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
+        unmarkAns(id); const pk2 = pairKeyOf(act); if (pk2) unmarkClinPair(pk2);
+        $('#btnActNow').disabled = false; checkActivity();
+        return;
+      }
+      if (res && res.ok){
+        const final = {
+          actId: id, title: optimistic.title, ts: ts,
+          correct: (res.correct === 'TRUE' ? true : (res.correct === 'FALSE' ? false : null)),
+          points: (res.points == null ? 0 : Number(res.points)),
+          userAnswer: ans, Finalized: true
+        };
+        state.lastSubmission = final;
+        renderLatest(final);
+        addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: true });
+      }
     }
 
   } catch (err) {
@@ -740,12 +1017,13 @@ function renderLatest(x){
        const t = optMap[K];
        return t ? `${K}. ${t}` : K;
      }
-     const L = choiceLetterOf_(raw);
+     const m = String(raw||'').trim().match(/^([A-Dก-ง])[\.\)]?/i);
+     const L = m ? m[1].toUpperCase() : '';
      if(L){
        const t = optMap[L];
        return t ? `${L}. ${t}` : raw;
      }
-    return raw;
+     return raw;
   };
 
   const ansText=ansKey ? mapAnswerText(act, ansKey) : '';
@@ -784,12 +1062,6 @@ function _normStr(s){
 function stripChoicePrefix_(s){
   return String(s||'').replace(/^\s*([A-Dก-ง])[\.\)]?\s*/i,'');
 }
-function choiceLetterOf_(s){
-  const t = String(s||'').trim();
-  const m = t.match(/^([A-D])[\.\)]?/i) || t.match(/^([ก-ง])[\.\)]?/);
-  return m ? m[1].toUpperCase() : '';
-}
-
 function clientIsCorrect(meta, userAns){
   const cat = String(meta.Category||'');
   if(/DAY(1|16)_LOTTO/i.test(cat)){
@@ -800,6 +1072,7 @@ function clientIsCorrect(meta, userAns){
   const a = _normStr(stripChoicePrefix_(meta.Answer));
   const u = _normStr(userAns);
   if(u && a && u===a) return true;
+
   const letterMap = {A:'OptionA',B:'OptionB',C:'OptionC',D:'OptionD','ก':'OptionA','ข':'OptionB','ค':'OptionC','ง':'OptionD'};
   if(u.length===1){
     const keyRaw = String(userAns||'').trim();
@@ -807,7 +1080,8 @@ function clientIsCorrect(meta, userAns){
     const full = key ? _normStr(stripChoicePrefix_(meta[key]||'')) : '';
     if(full && full===a) return true;
   }
-  const ansLetter = choiceLetterOf_(meta.Answer);
+  const m = String(meta.Answer||'').trim().match(/^([A-Dก-ง])[\.\)]?/i);
+  const ansLetter = m ? m[1].toUpperCase() : '';
   if(ansLetter){
     if(String(userAns||'').trim().toUpperCase() === ansLetter) return true;
     const opt = letterMap[ansLetter];
