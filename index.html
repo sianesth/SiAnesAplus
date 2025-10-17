@@ -1,422 +1,822 @@
-/***** Sianes Point — Apps Script v38 *****/
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>ANESA+ — User (latest)</title>
+<link rel="preconnect" href="https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
+<link rel="preload" as="image" href="logo3.png" />
+<style>
+  :root{ --bg:#f6f8fd;--card:#fff;--line:#e6e9f2;--txt:#0f1733;--muted:#6b78a6;--btn:#1f6fff;--danger:#d93025; --ok:#0a8c4a; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{ font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--txt); }
+  header{ position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:12px; background:#0b1020; color:#fff; padding:10px 14px;}
+  header img{height:44px;width:auto}
+  .brand{display:flex;flex-direction:column;line-height:1.15}
+  .brand .sys{font-size:24px;font-weight:800;letter-spacing:.2px}
+  .brand .welcome{font-size:13px;color:#cdd4f0}
+  .spacer{flex:1}
+  #btnLogout{background:#1f6fff;color:#fff;border:none;border-radius:12px;padding:8px 14px;cursor:pointer;box-shadow:0 6px 16px rgba(31,111,255,.25);}  
+  main{max-width:980px;margin:0 auto;padding:14px;display:grid;gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 16px 16px;position:relative;}
+  .card>h3:first-child{position:absolute;top:-12px;left:16px;margin:0;padding:6px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;gap:6px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input,button{border-radius:12px;border:1px solid var(--line);padding:10px 12px;font:inherit}
+  button{cursor:pointer;background:var(--btn);color:#fff;border-color:transparent}
+  button.ghost{background:#0f1733;color:#fff}
+  button[disabled]{background:#cfd7ff;color:#6570a0;cursor:not-allowed}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;background:#eef3ff;border-radius:999px;padding:6px 12px;margin-right:8px}
+  body.is-login{overflow:hidden}
+  #loginBox{display:flex;align-items:flex-start;justify-content:center;padding:12px}
+  .login-card{width:min(560px,92vw);background:#ffffffcc;border:1px solid var(--line);border-radius:18px;padding:20px 16px 16px;box-shadow:0 12px 30px rgba(0,0,0,.06);text-align:center}
+  .login-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 6px;display:block}
+  .login-title{font-weight:800;font-size:clamp(18px,3.6vw,24px);margin:2px 0}
+  .login-sub{margin:0 0 12px;color:#5f6ea5}
+  .login-row{display:flex;justify-content:center;gap:10px}
+  #sap{width:150px;text-align:center}
+  .reward{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+  .reward img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#f4f6fb;border:1px solid var(--line)}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+  #qrModal,#actModal,#chooseModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);z-index:60}
+  #qrBox,#actBox,#chooseBox{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;max-width:640px;width:92vw}
+  .timer{font-variant-numeric:tabular-nums;font-size:22px}
+  .pill2{display:inline-block;background:#fff7e6;border:1px solid #ffd18a;color:#8a5300;border-radius:999px;padding:4px 10px}
+  .bad{color:var(--danger)}
+  .ok{color:var(--ok)}
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0c8c5f;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.18);opacity:0;transition:.25s;z-index:999}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+  .latest{border:1px dashed var(--line); background:#f7f9ff; border-radius:10px; padding:10px; margin-bottom:10px;}
+  .latest b{font-weight:800}
+  .actrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+  .actrow .flex1{flex:1;min-width:0}
+  .actrow .title{font-weight:700}
+  .actrow .sub{color:var(--muted);font-size:12px}
+  @media(max-width:520px){ header img{height:40px}.brand .sys{font-size:22px}.card>h3:first-child{font-size:14px;padding:5px 10px}#sap{width:130px}}
+  #actList{display:none!important}
 
-/* ===== Spreadsheet config ===== */
-var SPREADSHEET_ID = "1bdK2O6d_YgrCCuH3RGgwEUaY2O5WPJA-zEkp_BSFYR8";
-var TZ = Session.getScriptTimeZone() || "Asia/Bangkok";
-var SHEETS = {
-  USERS:"Users",
-  REWARDS:"Rewards",
-  ACTIVITIES:"Activities",
-  SUBMISSIONS:"Submissions",
-  REDEMPTIONS:"Redemptions",
-  ANSWER_KEY:"AnswerKey",
-  LOGS:"Logs",
-  ADMINS:"Admins" // fallback ถ้าไม่มีชีต getAdmins
-};
+  /* จัดกึ่งกลางคอลัมน์แต้มของรายงานแบบสอบถามประจำปี */
+  #annualBox table th:last-child,
+  #annualBox table td:last-child { text-align: center; width: 90px; }
+  /* จัดกึ่งกลางคอลัมน์ ผลตอบ และ แต้ม ในรายงานกิจกรรมรายสัปดาห์ */
+  #weeklyBox table th:nth-child(3),
+  #weeklyBox table td:nth-child(3),
+  #weeklyBox table th:nth-child(4),
+  #weeklyBox table td:nth-child(4) { text-align: center; width: 90px; }
+</style>
+</head>
+<body class="is-login">
+<header>
+  <img src="logo4.png" alt="logo" />
+  <div class="brand">
+    <div class="sys">Anesthesia A+</div>
+    <div id="welcomeText" class="welcome" style="display:none">ยินดีต้อนรับคุณ —</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="btnLogout" class="ghost" style="display:none">ออกจากระบบ</button>
+</header>
 
-/* ===== Script Properties =====
-  RTDB_URL = https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app/
-  FIREBASE_CLIENT_EMAIL
-  FIREBASE_PRIVATE_KEY
-*/
-function PROP(){ return PropertiesService.getScriptProperties(); }
-function RTDB_URL(){ return (PROP().getProperty("RTDB_URL")||"").replace(/\/+$/,"")+"/"; }
-function FIREBASE_CLIENT_EMAIL(){ return PROP().getProperty("FIREBASE_CLIENT_EMAIL")||""; }
-function FIREBASE_PRIVATE_KEY(){ var k=PROP().getProperty("FIREBASE_PRIVATE_KEY")||""; return k.replace(/\\n/g,"\n"); }
+<main>
+  <!-- Login -->
+  <section id="loginBox">
+    <div class="login-card">
+      <img src="logo3.png" alt="Mascot" class="login-logo" />
+      <h1 class="login-title">เข้าสู่ระบบ Anesthesia A+<br>ตอน “ล่าทิ้ว...บิ้วแต้ม”</h1>
+      <p class="login-sub">ใส่รหัส <b>SAP</b> ของคุณ เพื่อเริ่มสะสมแต้มและแลกรางวัล</p>
+      <div class="login-row">
+        <input id="sap" placeholder="SAP" inputmode="numeric" autocomplete="off" />
+        <button id="btnLogin">เข้าสู่ระบบ</button>
+      </div>
+      <div id="loginMsg" class="muted" style="margin-top:8px;min-height:20px"></div>
+    </div>
+  </section>
 
-/* ===== Utils ===== */
-function SS(){ return SpreadsheetApp.openById(SPREADSHEET_ID); }
-function num(v){ v=Number(v); return isFinite(v)?v:0; }
-function nowISO(){ return Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd'T'HH:mm:ssXXX"); }
-function parseHeader_(arr){ var H={},i; for(i=0;i<arr.length;i++){ H[String(arr[i]).trim()]=i; } return H; }
-function readSheet_(name){
-  var sh=SS().getSheetByName(name), v=sh.getDataRange().getDisplayValues();
-  if(v.length<2) return {sh:sh,H:{},vals:v,rows:[]};
-  var H=parseHeader_(v[0]); return {sh:sh,H:H,vals:v,rows:v.slice(1)};
-}
-function log_(action,msg,details){
-  try{ SS().getSheetByName(SHEETS.LOGS).appendRow([nowISO(),"",action,"",String(msg||""),JSON.stringify(details||{}),""]); }catch(e){}
-}
+  <!-- KPI + Top20 -->
+  <section id="kpiBox" class="card" style="display:none">
+    <h3>📊 คะแนนสะสมของคุณ</h3>
+    <div class="row" style="align-items:center">
+      <span class="pill">รวมทั้งหมด <b id="uEarned">0</b></span>
+      <span class="pill">ใช้ไปแล้ว <b id="uUsed">0</b></span>
+      <span class="pill">คงเหลือ <b id="uTotal">0</b></span>
+      <span class="spacer"></span>
+      <button id="btnTop20">🏆 ดู Top 20</button>
+    </div>
+  </section>
 
-/* ===== Service Account → access_token ===== */
-function getAccessToken_(){
-  var header={alg:"RS256",typ:"JWT"};
-  var now=Math.floor(Date.now()/1000);
-  var claim={
-    iss:FIREBASE_CLIENT_EMAIL(),
-    scope:"https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
-    aud:"https://oauth2.googleapis.com/token",
-    iat:now,exp:now+3600
-  };
-  function b64(o){ return Utilities.base64EncodeWebSafe(Utilities.newBlob(JSON.stringify(o)).getBytes()).replace(/=+$/,""); }
-  var unsigned=b64(header)+"."+b64(claim);
-  var sig=Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(unsigned,FIREBASE_PRIVATE_KEY())).replace(/=+$/,"");
-  var jwt=unsigned+"."+sig;
-  var res=UrlFetchApp.fetch("https://oauth2.googleapis.com/token",{
-    method:"post",
-    payload:{grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:jwt}
-  });
-  return JSON.parse(res.getContentText()).access_token;
-}
-function rtdbPut_(path,obj){
-  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
-  var t=getAccessToken_();
-  UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{
-    method:"put",contentType:"application/json",payload:JSON.stringify(obj),muteHttpExceptions:true
-  });
-}
-function rtdbPatch_(path,obj){
-  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
-  var t=getAccessToken_();
-  UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{
-    method:"patch",contentType:"application/json",payload:JSON.stringify(obj),muteHttpExceptions:true
-  });
-}
-function rtdbGet_(path){
-  var url=RTDB_URL()+path.replace(/^\/+/,'')+".json";
-  var t=getAccessToken_();
-  var res=UrlFetchApp.fetch(url+"?access_token="+encodeURIComponent(t),{muteHttpExceptions:true});
-  return JSON.parse(res.getContentText()||"null");
-}
+  <!-- Today / Activities -->
+  <section id="actTodayCard" class="card" style="display:none">
+    <h3>🍀 กิจกรรมวันนี้</h3>
+    <div id="actLatest" class="latest" style="display:none"></div>
+    <div id="actTodayInfo" class="muted" style="display:none"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnActNow">คำถามตอนนี้</button>
+      <button id="btnWinners">Top 20 ผู้ตอบถูก (วันนี้)</button>
+    </div>
+    <div id="actList" style="margin-top:10px;display:none"></div>
+  </section>
 
-/* ===== Readers ===== */
-function readUsers(){
-  var o=readSheet_(SHEETS.USERS),H=o.H,rows=o.rows,out={},i,r,sap;
-  for(i=0;i<rows.length;i++){
-    r=rows[i]; sap=String(r[H.SAP]||"").trim(); if(!sap) continue;
-    out[sap]={sap:sap,name:r[H.Name]||"",type:r[H.Type]||"",status:r[H.Status]||"",
-      pointsEarned:num(r[H.PointsEarned]),pointsUsed:num(r[H.PointsUsed]),pointsTotal:num(r[H.PointsTotal])};
-  } return out;
-}
-function readRewards(){
-  var o=readSheet_(SHEETS.REWARDS),H=o.H,rows=o.rows,out={},i,r,name;
-  for(i=0;i<rows.length;i++){
-    r=rows[i]; 
-    name=String(r[H.RewardName]||"").trim(); 
-    if(!name) continue;
+  <!-- Rewards -->
+  <section id="rewardsBox" class="card" style="display:none">
+    <h3>🎁 ของรางวัลที่แลกได้</h3>
+    <div class="muted" style="margin:-6px 0 8px">อัปเดตอัตโนมัติ (realtime)</div>
+    <div id="rewards"></div>
+    <div id="lockBanner" class="muted" style="margin-top:6px;display:none">
+      <span>มี QR รอการยืนยัน — หมดอายุใน <b class="timer" id="bannerTimer">10:00</b></span>
+      <button class="ghost" id="bannerShow" style="margin-left:8px">เปิด QR</button>
+    </div>
+  </section>
 
-    var rawUrl = r[H.ImageURL] || r[H.ImageUrl] || r[H.Image] || "";
-    var imageUrl = rawUrl;
-    if(rawUrl.indexOf("drive.google.com/file/d/")>-1){
-      var match = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if(match && match[1]) imageUrl = "https://drive.google.com/uc?export=view&id=" + match[1];
-    }
-    out[name] = {
-      pointsRequired:num(r[H.PointsRequired]),
-      stock:num(r[H.StockRemaining]),
-      imageUrl:imageUrl
-    };
-  }
-  return out;
-}
-function readActivities(){
-  var o=readSheet_(SHEETS.ACTIVITIES),H=o.H,rows=o.rows,out={},i,r,id;
-  for(i=0;i<rows.length;i++){
-    r=rows[i]; id=String(r[H.ActID]||"").trim(); if(!id) continue;
-    out[id]={ActID:id,Category:String(r[H.Category]||""),GroupId:String(r[H.GroupId]||""),
-      Title:String(r[H.Title]||""),Question:String(r[H.Question]||""),InputType:String(r[H.InputType]||"choice"),
-      OptionA:String(r[H.OptionA]||"ก"),OptionB:String(r[H.OptionB]||"ข"),Answer:String(r[H.Answer]||""),
-      BasePoints:num(r[H.BasePoints]||0),CorrectBonus:num(r[H.CorrectBonus]||0),
-      FirstN:num(r[H.FirstN]||0),FirstNBonus:num(r[H.FirstNBonus]||0),
-      FirstNRequiresCorrect:String(r[H.FirstNRequiresCorrect]||"").toLowerCase()==="true",
-      WindowStart:String(r[H.WindowStart]||""),WindowEnd:String(r[H.WindowEnd]||""),AnswerReleaseAt:String(r[H.AnswerReleaseAt]||"")};
-  } return out;
-}
+  <!-- History -->
+  <section id="historyBox" class="card" style="display:none">
+    <h3>📄 ประวัติการแลก</h3>
+    <table>
+      <thead><tr><th>เวลา</th><th>รางวัล</th><th>แต้ม</th><th>สถานะ</th></tr></thead>
+      <tbody id="history"><tr><td colspan="4" style="text-align:center">—</td></tr></tbody>
+    </table>
+  </section>
 
-/* ===== Writers (อัปเดตเฉพาะแถว) ===== */
-function writeUsersTotal_(sap,dEarned,dUsed){
-  var o=readSheet_(SHEETS.USERS),sh=o.sh,H=o.H,v=o.vals,i,row;
-  for(i=1;i<v.length;i++){
-    row=v[i];
-    if(String(row[H.SAP]).trim()===String(sap)){
-      var earned=num(row[H.PointsEarned])+num(dEarned||0);
-      var used  =num(row[H.PointsUsed])  +num(dUsed||0);
-      var total =earned-used;
-      sh.getRange(i+1, H.PointsEarned+1, 1, 3).setValues([[earned, used, total]]);
-      return {earned:earned,used:used,total:total};
-    }
-  } throw new Error("SAP not found: "+sap);
-}
-function adjustRewardStock_(rewardName,delta){
-  var o=readSheet_(SHEETS.REWARDS),sh=o.sh,H=o.H,v=o.vals,i,row;
-  for(i=1;i<v.length;i++){
-    row=v[i];
-    if(String(row[H.RewardName]).trim()===String(rewardName)){
-      var before=num(row[H.StockRemaining]), after=before+num(delta||0);
-      if(after<0) throw new Error("ของรางวัลไม่พอ");
-      sh.getRange(i+1, H.StockRemaining+1).setValue(after);
-      return {before:before,after:after};
-    }
-  } throw new Error("Reward not found: "+rewardName);
-}
-function appendRedemption_(sap,rewardName,pts,stockBefore,stockAfter,note){
-  SS().getSheetByName(SHEETS.REDEMPTIONS)
-     .appendRow([nowISO(),sap,rewardName,num(pts||0),num(stockBefore||0),num(stockAfter||0),note||""]);
-}
-function appendSubmission_(o){
-  SS().getSheetByName(SHEETS.SUBMISSIONS)
-    .appendRow([o.ts,o.sap,o.actId,o.answer,o.correct,o.points,o.source,o.category,o.groupId,o.finalized]);
-}
+  <!-- Weekly -->
+  <section id="weeklyBox" class="card" style="display:none">
+    <h3>📅 รายงานกิจกรรมรายสัปดาห์</h3>
+    <table>
+      <thead><tr><th>วดป</th><th>ชื่อกิจกรรม</th><th>ผลตอบ</th><th>แต้ม</th></tr></thead>
+      <tbody id="weekly"><tr><td colspan="4" style="text-align:center">—</td></tr></tbody>
+    </table>
+  </section>
 
-/* ===== Policy (คะแนน) ===== */
-function policyFor_(cat){
-  var p={ base:2, bonusCorrect:2, firstN:20, firstNBonus:2, firstNNeedCorrect:true };
-  if(/MON_/i.test(cat)){ p.base=2; p.bonusCorrect=1; p.firstN=20; p.firstNBonus=1; }
-  else if(/WED_/i.test(cat)){ p.base=2; p.bonusCorrect=2; p.firstN=20; p.firstNBonus=2; }
-  else if(/FRI_/i.test(cat)){ p.base=2; p.bonusCorrect=2; p.firstN=20; p.firstNBonus=2; }
-  else if(/DAY(1|16)_LOTTO/i.test(cat)){ p.base=0; p.bonusCorrect=3; p.firstN=0; p.firstNBonus=0; }
-  return p;
-}
-function pushWinner_(actId,sap){
-  try{
-    var base="secure/activities/"+encodeURIComponent(actId)+"/winners";
-    var list=rtdbGet_(base)||[]; if(list.indexOf(String(sap))===-1){
-      list.push(String(sap));
-      rtdbPut_(base,list.slice(0,200));
-      rtdbPut_("public/winners/"+encodeURIComponent(actId),list.slice(0,20));
-    }
-  }catch(e){ log_("winner_err",String(e),{act:actId,sap:sap}); }
-}
+  <!-- Annual forms -->
+  <section id="annualBox" class="card" style="display:none">
+    <h3>🗓️ รายงานทำแบบสอบถามประจำปี</h3>
+    <table>
+      <thead><tr><th>วดป</th><th>ชื่อแบบสอบถาม</th><th>แต้ม (รวม)</th></tr></thead>
+      <tbody id="annual"><tr><td colspan="3" style="text-align:center">—</td></tr></tbody>
+    </table>
+  </section>
+</main>
 
-/* ===== Public Snapshot ===== */
-function refreshSnapshots(){
-  var users=readUsers(), rewards=readRewards(), acts=readActivities();
-  rtdbPut_("public/usersSummary",users);
-  rtdbPut_("public/rewards",rewards);
-  rtdbPut_("public/activities",acts);
+<div id="top20Modal" class="modal" style="display:none">
+  <div class="modal-card">
+    <h3>Top 20 คะแนนสะสม</h3>
+    <table>
+      <thead>
+        <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th style="text-align:right">คะแนน</th></tr>
+      </thead>
+      <tbody id="top20List"><tr><td colspan="3" class="muted">—</td></tr></tbody>
+    </table>
+    <button onclick="hideModalTop20()">ปิด</button>
+  </div>
+</div>
 
-  var arr=[],k; for(k in users) if(users.hasOwnProperty(k)){ arr.push({sap:k,name:users[k].name||k,pts:num(users[k].pointsTotal)}); }
-  arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
-  rtdbPut_("public/leaderboard",arr.slice(0,20));
-  return {ok:true};
-}
+<!-- QR Modal -->
+<div id="qrModal"><div id="qrBox">
+  <div class="row" style="align-items:center;margin-bottom:6px">
+    <h3 style="margin:0">สแกน QR เพื่อยืนยันการแลก</h3>
+    <span class="pill2" style="margin-left:auto">หมดอายุใน <b class="timer" id="qrTimer">10:00</b></span>
+  </div>
+  <div class="row" style="align-items:center">
+    <div style="flex:1">
+      <div>รางวัล: <b id="qrRewardName"></b> • ต้องใช้ <b id="qrPoints"></b> แต้ม</div>
+      <div id="qrAck" class="muted" style="margin-top:6px"></div>
+      <div id="qrExpired" class="bad" style="display:none;margin-top:6px">QR หมดอายุแล้ว กรุณากดแลกใหม่</div>
+    </div>
+    <img id="qrImg" alt="QR" style="width:180px;height:180px;border:1px solid var(--line);border-radius:8px;background:#fff" />
+  </div>
+  <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <button id="btnCloseQR" class="ghost">ปิด</button>
+  </div>
+</div></div>
 
-/* ===== NEW: อ่านรายชื่อ Admins จากชีต getAdmins (fallback: SHEETS.ADMINS) ===== */
-function getAdmins(){
-  try{
-    var sh = SS().getSheetByName("getAdmins") || SS().getSheetByName(SHEETS.ADMINS);
-    if(!sh) return {ok:false, error:"Sheet getAdmins/Admins not found"};
-    var v = sh.getDataRange().getDisplayValues();
-    if(v.length < 2) return {ok:false, error:"No rows"};
+<!-- Activity Modal -->
+<div id="actModal"><div id="actBox">
+  <h3 id="actTitle">กิจกรรม</h3>
+  <div id="actQuestion" class="muted" style="margin-bottom:8px"></div>
+  <div id="actOpts"></div>
+  <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <button id="btnActSubmit">ส่งคำตอบ</button>
+    <button id="btnActClose" class="ghost">ปิด</button>
+  </div>
+  <div id="actStatus" class="muted" style="margin-top:6px"></div>
+</div></div>
 
-    var H = parseHeader_(v[0]);
-    var cand = ["Name","Admin","AdminName","DisplayName"];
-    var idx = -1, i;
-    for(i=0;i<cand.length;i++){ if(H.hasOwnProperty(cand[i])) { idx = H[cand[i]]; break; } }
-    if(idx < 0) idx = 0;
+<!-- Two-step chooser -->
+<div id="chooseModal"><div id="chooseBox">
+  <h3 style="margin-top:0">เลือกชุดคำถาม</h3>
+  <div id="chooseBody" class="row"></div>
+  <div style="text-align:right;margin-top:8px">
+    <button id="btnChooseClose" class="ghost">ปิด</button>
+  </div>
+</div></div>
 
-    var set = {};
-    for(i=1;i<v.length;i++){
-      var name = String(v[i][idx] || "").trim();
-      if(name) set[name] = true;
-    }
-    var list = Object.keys(set);
-    return {ok:true, items:list};
-  }catch(err){
-    return {ok:false, error:String(err)};
-  }
-}
+<dialog id="dlgTop"><div style="min-width:320px">
+  <h3 id="dlgTopTitle">Top 20 คะแนนสะสม</h3>
+  <div id="dlgTopBody"></div>
+  <div style="text-align:right;margin-top:8px"><button onclick="this.closest('dialog').close()">ปิด</button></div>
+</div></dialog>
 
-/* ===== JSONP Web API ===== */
-function doGet(e){
-  var cb=(e && e.parameter && e.parameter.callback) || "callback";
-  var action=(e && e.parameter && String(e.parameter.action||"")) || "";
-  var out;
-  try{
-    if(action==="submitActivity"){
-      out=submitActivity_(String(e.parameter.sap||""),String(e.parameter.actId||""),String(e.parameter.answer||""),String(e.parameter.source||"web"));
-    }else if(action==="redeemReward"){
-      out=redeemReward_(String(e.parameter.sap||""),String(e.parameter.rewardName||""));
-    }else if(action==="confirmRedeem"){
-      out=confirmRedeem_(String(e.parameter.sap||""),String(e.parameter.rewardName||""),String(e.parameter.admin||""),String(e.parameter.ts||""),Number(e.parameter.points||0));
-    }else if(action==="refreshSnapshots"){
-      out=refreshSnapshots();
-    }else if(action==="getAdmins"){
-      out=getAdmins();
-    }else{
-      out={ok:false,error:"Unknown action"};
-    }
-  }catch(err){ out={ok:false,error:String(err && err.message || err)}; }
-  return ContentService.createTextOutput(cb+"("+JSON.stringify(out)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-}
+<div id="toast" class="toast"></div>
 
-/* ===== Submissions (กันตอบซ้ำ + คิดแต้ม) ===== */
-function hasSubmission_(sap,actId){
-  var o=readSheet_(SHEETS.SUBMISSIONS),H=o.H,rows=o.rows,i,r;
-  for(i=0;i<rows.length;i++){ r=rows[i]; if(String(r[H.SAP]||"")===String(sap) && String(r[H.ActID]||"")===String(actId)) return true; }
-  return false;
-}
-function submitActivity_(sap,actId,answer,source){
-  if(!sap) throw new Error("sap required");
-  if(!actId) throw new Error("actId required");
-  if(hasSubmission_(sap,actId)) return {ok:false,error:"ตอบกิจกรรมนี้แล้ว"};
+<footer style="text-align:center;color:#8b94b2;font-size:12px;margin:8px 0">
+  © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล
+</footer>
 
-  var acts=readActivities(), act=acts[actId]; if(!act) throw new Error("Activity not found: "+actId);
-  var now=new Date();
-  if(act.WindowStart && now < new Date(act.WindowStart)) return {ok:false,error:"ยังไม่ถึงเวลา"};
-  if(act.WindowEnd   && now > new Date(act.WindowEnd))   return {ok:false,error:"หมดเวลาแล้ว"};
+<!-- ====== (ใหม่) URL + ฟังก์ชันส่งเข้า Sheet (global) ====== -->
+<script>
+  // URL ของ Web App (ลงท้าย /exec)
+  window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxM9jUAMMxeYe-6ia6lMsh4mTYiaye0mc16LesfMBN3HTcRFIBEjnMRUQaRZDejDabLg/exec";
 
-  var pol=policyFor_(act.Category||"");
-  var reveal=(act.Answer||"").trim();
-  var correct=null, points=0, finalized=false;
+  // ส่งเข้า Google Sheet: เลือกโหมดตามสภาพแวดล้อมอัตโนมัติ
+  window.postSubmissionToSheet = async function(payload){
+    payload = payload || {};
+    if (!payload.action)    payload.action    = 'submitanswer';
+    if (!payload.timestamp) payload.timestamp = new Date().toISOString();
+    if (!payload.client)    payload.client    = (location.protocol === 'file:' ? 'file-mode' : 'web-anesa+');
 
-  if(reveal){
-    correct=String(answer||"").toUpperCase()===reveal.toUpperCase();
-    points+=num(pol.base);
-    if(correct){
-      points+=num(pol.bonusCorrect);
-      if(pol.firstN>0){
-        var winners=rtdbGet_("secure/activities/"+encodeURIComponent(actId)+"/winners")||[];
-        if(winners.length<pol.firstN){ pushWinner_(actId,sap); points+=num(pol.firstNBonus); }
+    const isFile = (location.protocol === 'file:'); // เปิดจาก Notepad/Explorer
+
+    try{
+      const res = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        ...(isFile ? { mode:'no-cors' } : {}),
+        body: JSON.stringify(payload)
+        // ไม่ใส่ headers เพื่อเลี่ยง preflight
+      });
+
+      // โหมด file:/// อ่านผลตอบกลับไม่ได้ แต่ส่งถึง Apps Script
+      if (isFile) return true;
+
+      // โหมดเว็บไซต์จริง: อ่านผล JSON จาก Apps Script ได้
+      const data = await res.json();
+      return data; // { ok:true, correct:'TRUE|FALSE|PENDING', points:... }
+    }catch(e){
+      // สำรอง: พยายามส่งด้วย sendBeacon
+      try{
+        const ok = navigator.sendBeacon?.(
+          SCRIPT_URL,
+          new Blob([JSON.stringify(payload)], { type:'text/plain' })
+        );
+        return isFile ? !!ok : { ok: !!ok };
+      }catch(_){
+        console.error('submit failed:', e);
+        return isFile ? false : { ok:false, error:String(e) };
       }
     }
-    finalized=true;
-  }else{
-    points+=num(pol.base);
-    finalized=false;
+  };
+</script>
+
+<!-- ====== โมดูลหลัก (Firebase + UI + logic) ====== -->
+<script type="module">
+/* ========= Config ========= */
+const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+const { getDatabase, ref, onValue, get, off, child } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
+const app = initializeApp({
+  apiKey: "AIzaSyCMTpAce-Q-fTkS7xDDYuEpPwgtBIrDP04",
+  authDomain: "anespoint-bfd3d.firebaseapp.com",
+  databaseURL: "https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anespoint-bfd3d",
+  appId: "1:1234567890:web:abcdef123456"
+});
+
+// Endpoints
+const DB_URL = "https://anespoint-bfd3d-default-rtdb.asia-southeast1.firebasedatabase.app";
+const ADMIN_PAGE_URL = "https://sianesth.github.io/AnesQD-Reward/"; 
+
+/* ========= Tiny helpers ========= */
+const $ = q => document.querySelector(q);
+const fmt = n => Number(n||0).toLocaleString('th-TH');
+const pad2 = n => String(n).padStart(2,'0');
+function toast(html,ms=3000){ const el=$('#toast'); el.innerHTML=html; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),ms); }
+function setWelcome(name){const el=$('#welcomeText'); if(name){ el.textContent='ยินดีต้อนรับคุณ '+name; el.style.display='block'; } else { el.style.display='none'; } }
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function todayKey(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+
+// Google Drive image helpers (deduped)
+function extractId(u){ const s=String(u||""); if(!s) return ""; const m = s.match(/\/d\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/); return m&&m[1]?m[1]:""; }
+function fixImg(u){ const s=String(u||'').trim(); if(!s) return ''; if(/uc\?export=view&id=/.test(s)) return s; const id=extractId(s); return id ? `https://drive.google.com/uc?export=view&id=${id}` : s; }
+function driveThumb(id){ return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w300` : ''; }
+
+/* ========= Session ========= */
+const SESSION_KEY = 'anes.session.v1';
+const saveSession = d => { try{ localStorage.setItem(SESSION_KEY, JSON.stringify(d)); }catch{} };
+const readSession = () => { try{ return JSON.parse(localStorage.getItem(SESSION_KEY)||'null'); }catch{ return null } };
+const clearSession = () => { try{ localStorage.removeItem(SESSION_KEY); }catch{} };
+function clearAutoPopupFlags(){ try{ const ks=[]; for(let i=0;i<sessionStorage.length;i++){ const k=sessionStorage.key(i); if(k && k.startsWith('anes.autopopup.')) ks.push(k); } ks.forEach(k=>sessionStorage.removeItem(k)); }catch{} }
+
+/* ========= State ========= */
+let state={ sap:null,total:0,name:'', leader:[], rewards:{}, activities:[], activitiesMap:{}, lastSubmission:null, weeklyRemote: [], annual: [], activityIndex:{} };
+let fb=null; let actIndex={};
+let _submitting = false;
+
+/* ========= Firebase ========= */
+async function ensureFirebase(){ if(fb) return fb; const db = getDatabase(app); fb={ app, db, ref, onValue, get, off, child }; return fb; }
+
+/* ========= Latest cache ========= */
+const latestStoreKey = () => `anes.latest.${todayKey()}.${state.sap||'0'}`;
+const saveLatestCache = x => { try{ localStorage.setItem(latestStoreKey(), JSON.stringify(x)); }catch{} };
+const readLatestCache = () => { try{ return JSON.parse(localStorage.getItem(latestStoreKey())||'null'); }catch{ return null } };
+const clearLatestCache = () => { try{ localStorage.removeItem(latestStoreKey()); }catch{} };
+
+/* ========= User fetch (fast) ========= */
+async function fetchUserQuick(sap){
+  const direct = [
+    `public/usersSummary/${encodeURIComponent(sap)}`,
+    `public/users/${encodeURIComponent(sap)}`,
+    `public/UsersSummary/${encodeURIComponent(sap)}`
+  ];
+  for(const p of direct){ try{ const r=await fetch(`${DB_URL}/${p}.json?t=${Date.now()}`,{cache:'no-store'}); if(r.ok){ const u=await r.json(); if(u&&typeof u==='object') return u; } }catch{} }
+  try{ const r2=await fetch(`${DB_URL}/public/usersSummary.json?t=${Date.now()}`,{cache:'no-store'}); if(r2.ok){ const all=await r2.json(); if(all && all[sap]) return all[sap]; } }catch{}
+  return null;
+}
+
+/* ========= Login / Logout ========= */
+$('#sap').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/[^\d]/g,'') });
+$('#btnLogin').onclick=async ()=>{
+  const s=$('#sap').value.trim(); 
+  if(!s){ $('#loginMsg').textContent='กรุณากรอก SAP'; return; }
+  $('#loginMsg').textContent='กำลังตรวจสอบ...';
+  let u=null; try{ u=await fetchUserQuick(s); }catch{}
+  if(!u){ $('#loginMsg').innerHTML='ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin'; return; }
+  const raw=(u?.Status ?? u?.status ?? u?.Active ?? 'Active');
+  const ok=!raw ? true : ['active','true','1','เปิด','ใช้งาน','enabled','on','yes'].includes(String(raw).trim().toLowerCase());
+  if(!ok){ $('#loginMsg').innerHTML='สถานะ <b>Non-active</b> • กรุณาติดต่อผู้ดูแลระบบ'; return; }
+
+  state.sap=s; state.name=((u && (u.name||u.Name)) || s); setWelcome(state.name);
+  saveSession({ sap:state.sap, name:state.name }); clearAutoPopupFlags();
+
+  document.body.classList.remove('is-login');
+  $('#loginBox').style.display='none';
+  $('#btnLogout').style.display='inline-block';
+  attachRealtime();
+  autoOpenOnceIfAvailable(true);   
+  scheduleAutoPopup();             
+};
+$('#btnLogout').onclick=()=>{ clearAutoPopupFlags(); clearLatestCache(); clearSession(); location.reload(); };
+
+/* ========= QR lock (10m) ========= */
+const QRKEY=()=>`anes.qrlock.${state.sap||'0'}`; let lock=null, raf=null;
+function loadLock(){ try{ const x=JSON.parse(localStorage.getItem(QRKEY())||'null'); if(!x) return null; if(Date.now()>x.until){ localStorage.removeItem(QRKEY()); return null } return x }catch{ return null } }
+function saveLock(o){ lock=o; localStorage.setItem(QRKEY(),JSON.stringify(o)); }
+function clearLock(){ lock=null; localStorage.removeItem(QRKEY()); }
+function disableRedeem(dis){ document.querySelectorAll('.btnRedeem').forEach(b=>b.disabled=dis); }
+function countdown(until){ const left=Math.max(0,until-Date.now()), mm=Math.floor(left/60000), ss=Math.floor((left%60000)/1000); $('#qrTimer').textContent=`${pad2(mm)}:${pad2(ss)}`; const b=$('#bannerTimer'); if(b) b.textContent=`${pad2(mm)}:${pad2(ss)}`; if(left<=0){ $('#qrExpired').style.display='block'; clearLock(); applyBanner(); if(raf) cancelAnimationFrame(raf); return; } raf=requestAnimationFrame(()=>countdown(until)); }
+function applyBanner(){ const el=$('#lockBanner'); if(lock){ el.style.display='block'; $('#bannerShow').onclick=()=>openQR(lock,true); disableRedeem(true); } else { el.style.display='none'; disableRedeem(false); } }
+function buildQRUrl(p){ const b64=btoa(unescape(encodeURIComponent(JSON.stringify(p)))); const url=`${ADMIN_PAGE_URL}#p=${encodeURIComponent(b64)}`; return `https://quickchart.io/qr?size=240&text=${encodeURIComponent(url)}`; }
+$('#btnCloseQR').onclick=()=>$('#qrModal').style.display='none';
+function openQR(o,fromResume=false){ $('#qrRewardName').textContent=o.reward; $('#qrPoints').textContent=fmt(o.pts); $('#qrExpired').style.display='none'; $('#qrAck').textContent=''; $('#qrImg').src=buildQRUrl({sap:o.sap,reward:o.reward,pts:o.pts,ts:o.ts,v:1}); $('#qrModal').style.display='flex'; countdown(o.until); if(!fromResume) applyBanner(); }
+function createQR(name,pts){ if(!state.sap) return; if(lock){applyBanner();return;} const ts=new Date().toISOString(), until=Date.now()+10*60*1000; const o={sap:state.sap,reward:name,pts,ts,until}; saveLock(o); disableRedeem(true); openQR(o); }
+
+/* ========= Weekly store ========= */
+function weeklyKey(){ return `anes.weekly.${state.sap||'0'}`; }
+function loadWeekly(){ try{ return JSON.parse(localStorage.getItem(weeklyKey())||'[]'); }catch{return []} }
+function saveWeekly(arr){ localStorage.setItem(weeklyKey(), JSON.stringify(arr)); }
+function addOrUpdateWeekly(e){ const arr=loadWeekly(); const i=arr.findIndex(x=>x.dateISO===e.dateISO && String(x.actId||'')===String(e.actId||'')); if(i>=0) arr[i]={...arr[i],...e}; else arr.push(e); saveWeekly(arr); renderWeekly(); }
+function thisWeekRange(){ const d=new Date(); const day=(d.getDay()+6)%7; const start=new Date(d); start.setHours(0,0,0,0); start.setDate(d.getDate()-day); const end=new Date(start); end.setDate(start.getDate()+7); return [start,end]; }
+
+function renderWeekly(){
+  const [wStart, wEnd]=thisWeekRange();
+
+  const localArr=loadWeekly().map(x=>({
+    dateText:String(x.dateISO||x.ts||''),
+    actId:String(x.actId||''),
+    title:String(x.title||''),
+    result:x.result,
+    points:x.points,
+    _source:'local'
+  }));
+
+  const remoteArr=(state.weeklyRemote||[]).map(x=>({
+    dateText:String(x.dateISO||x.ts||x.timestamp||''),
+    actId:String(x.actId||''),
+    title:String(x.title||''),
+    result:x.result,
+    points:x.points,
+    _source:'remote'
+  }));
+
+  const pickByKey={};
+  [...localArr,...remoteArr].forEach(x=>{
+    const t=parseLocal(x.dateText)||Date.parse(x.dateText);
+    const d=new Date(isNaN(t)?0:t);
+    if(!(d>=wStart && d<wEnd)) return;
+    const key = (d.toISOString().slice(0,10)) + '|' + x.actId;
+    const prev = pickByKey[key];
+    const item = {
+      _t:t, _d:d,
+      title: x.title || (getActMetaById(x.actId)||{}).Title || (getActMetaById(x.actId)||{}).Question || x.actId || '-',
+      result: x.result,
+      points: Number(x.points||0),
+      _source: x._source
+    };
+    if(!prev){ pickByKey[key]=item; return; }
+    const better =
+      (prev._source!=='remote' && item._source==='remote') ||
+      (item.points > prev.points);
+    if(better) pickByKey[key]=item;
+  });
+
+  const merged = Object.values(pickByKey).sort((a,b)=>b._t-a._t);
+  const html = merged.length
+    ? merged.map(r=>{
+        const th=r._d.toLocaleDateString('th-TH',{year:'numeric',month:'2-digit',day:'2-digit'});
+        const result=r.result==null?'รอตรวจ':(r.result?'ถูก':'ผิด');
+        const pts=(r.points==null)?'—':fmt(r.points);
+        return `<tr><td>${th}</td><td>${escapeHtml(r.title)}</td><td>${result}</td><td>${pts}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="4" style="text-align:center">—</td></tr>';
+
+  $('#weekly').innerHTML=html;
+  $('#weeklyBox').style.display='block';
+}
+
+/* ========= Annual ========= */
+function renderAnnual(){
+  const box=$('#annualBox'); const tb=$('#annual'); if(!box||!tb) return;
+  const raw=Array.isArray(state.annual)? state.annual : Object.values(state.annual||{});
+  const list=raw.slice().sort((a,b)=>{ const ta=new Date(a.timestamp||a.awardedAt||a.AwardedAt||0).getTime(); const tb=new Date(b.timestamp||b.awardedAt||b.AwardedAt||0).getTime(); return tb-ta; });
+  if(!list.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center">—</td></tr>'; box.style.display='block'; return; }
+  const rows=list.map(r=>{ const d=new Date(r.timestamp||r.awardedAt||r.AwardedAt||Date.now()); const dt=d.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}); const title=String(r.title||r.Title||`แบบสอบถามชุดที่ ${r.formNo||r.FormNo||''}`).trim(); const total=Number(r.totalPoints ?? (Number(r.basePoints||r.BasePoints||0)+Number(r.bonusPoints||r.BonusPoints||0)))||0; return `<tr><td>${dt}</td><td>${escapeHtml(title)}</td><td style="text-align:center">${total}</td></tr>`; }).join('');
+  tb.innerHTML=rows; box.style.display='block';
+}
+
+function parseLocal(s){ if(!s) return NaN; let t=String(s).trim(); t=t.replace(/([+\-]\d{2}):?(\d{2})$/, (m,hh,mm)=>{ const ok=['00','30','45']; return `${hh}:${ok.includes(mm)?mm:'00'}`; }).replace(/([+\-])(\d)(?=:)/,(_,sign,d)=>`${sign}0${d}`); if(/^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/.test(t)){ const ts=new Date(t.replace(' ','T')).getTime(); if(!Number.isNaN(ts)) return ts; } const ts2=new Date(t).getTime(); if(!Number.isNaN(ts2)) return ts2; const m=t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/); if(m){ const y=Number(m[3])<100?2000+Number(m[3]):Number(m[3]); const mm=Number(m[2])-1; const dd=Number(m[1]); const hh=Number(m[4]||0); const mi=Number(m[5]||0); return new Date(y,mm,dd,hh,mi).getTime(); } return NaN; }
+function isIn(st,en){ const now=Date.now(); const a=parseLocal(st); const b=parseLocal(en); if(Number.isNaN(a)&&Number.isNaN(b)) return true; if(Number.isNaN(a)) return now<=b; if(Number.isNaN(b)) return now>=a; const start=Math.min(a,b); const end=Math.max(a,b); return now>=start && now<=end; }
+function isTodayLocal(str){ const t=parseLocal(str); if(Number.isNaN(t)) return false; const d=new Date(t), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
+function aKey(id){ return `anes.act.answered.${id}.${todayKey()}.${state.sap||'0'}`; }
+function markAns(id){ localStorage.setItem(aKey(id),'1'); }
+function hasAns(id){ if(!id) return false; if(localStorage.getItem(aKey(id))) return true; const x=state.lastSubmission; if(!x) return false; const same=String(x.actId||'')===String(id||''); const ts=x.ts||x.timestamp; if(!ts) return false; const d=new Date(ts), n=new Date(); return same && d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
+function titleClinType(t){ const s=String(t||'').toLowerCase(); if(/\bnon[-\s]?clinical\b/.test(s) || /(non[-\s]?clinical)/i.test(t)) return 'nonclin'; if(/\bclinic\b/.test(s) || /\bclinical\b/.test(s) || /(clinic)/i.test(t)) return 'clin'; return null; }
+function pairKeyOf(a){ const g=a.GroupId||a.groupId||''; const t=a.Title||a.Question||''; const tag=titleClinType(t); return (g && tag)?String(g):null; }
+function clinPairStoreKey(key){ return `anes.group.clinpair.${key}.${todayKey()}.${state.sap||'0'}`; }
+function markClinPair(key){ if(!key) return; localStorage.setItem(clinPairStoreKey(key),'1'); }
+function clinPairAnswered(key){ if(!key) return false; return !!localStorage.getItem(clinPairStoreKey(key)); }
+
+/* ========= Preload activities for titles ========= */
+let _allActsLoaded=false;
+async function preloadAllActivities(){ if(_allActsLoaded) return; _allActsLoaded=true; try{ const r=await fetch(`${DB_URL}/public/activities.json?t=${Date.now()}`,{cache:'no-store'}); const all=r.ok?await r.json():null; if(all){ Object.values(all).forEach(a=>{ const id=a.ActID||a.id||a.actId; if(id) state.activityIndex[id]=a; }); renderWeekly(); } }catch{} }
+function getActMetaById(id){ if(!id) return null; if(actIndex && actIndex[id]) return actIndex[id]; const todays=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{}); const hit=todays.find(a=>(a.ActID||a.id||a.actId)===id); if(hit) return hit; if(state.activityIndex && state.activityIndex[id]) return state.activityIndex[id]; return null; }
+
+/* ========= Realtime wires ========= */
+async function attachRealtime(){
+  const FB=await ensureFirebase();
+  await preloadAllActivities();
+
+  onValue(ref(FB.db,'public/usersSummary/'+state.sap), s=>{
+    const v=s.val()||{};
+    state.total=Number(v.pointsTotal||v.PointsTotal||0);
+    ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox'].forEach(id=>$('#'+id).style.display='block');
+    $('#uEarned').textContent=fmt(v.pointsEarned||v.PointsEarned||0);
+    $('#uUsed').textContent=fmt(v.pointsUsed||v.PointsUsed||0);
+    $('#uTotal').textContent=fmt(v.pointsTotal||v.PointsTotal||0);
+    renderRewards(); lock=loadLock(); applyBanner(); if(lock) openQR(lock,true); renderWeekly();
+  });
+
+  onValue(ref(FB.db,'public/redemptions/'+state.sap), s=>{
+    const arr=s.val()||[];
+    $('#history').innerHTML = Array.isArray(arr)&&arr.length
+      ? arr.slice(-50).reverse().map(x=>`<tr><td>${escapeHtml((x.timestamp||'').replace('T',' ').slice(0,19))}</td><td>${escapeHtml(x.rewardName||'')}</td><td>${fmt(x.points||0)}</td><td>${escapeHtml(x.status||'')}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center">—</td></tr>';
+  });
+
+  onValue(ref(FB.db,'public/rewards'), s=>{ state.rewards=s.val()||{}; renderRewards(); if(lock) disableRedeem(true); });
+  onValue(ref(FB.db,'public/leaderboard'), s=>{ state.leader=s.val()||[]; });
+  onValue(ref(FB.db,'public/actIndex'), snap=>{ actIndex=snap.val()||{}; renderWeekly(); renderLatest(state.lastSubmission||readLatestCache()); });
+
+  onValue(ref(FB.db,'public/redeemAck/'+state.sap), s=>{
+    const a=s.val(); if(!a) return; const key=`ack:${state.sap}:${a.timestamp||''}:${a.rewardName||''}`; if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); try{$('#qrModal').style.display='none';}catch{}; const dt=(a.timestamp||'').replace('T',' ').slice(0,19); toast(`✅ ได้รับรางวัลแล้ว<br><b>${escapeHtml(a.rewardName||'')}</b><br>${escapeHtml(dt)} • โดย ${escapeHtml(a.admin||'admin')}`,4500); $('#qrAck').textContent=`แลก "${a.rewardName}" สำเร็จ ✓ โดย ${a.admin||'admin'}`; clearLock(); applyBanner(); renderRewards();
+  });
+
+  preloadAllActivities();
+  wireWeeklyRealtime();
+  wireAnnualRealtime();
+
+  ensureActivitiesRealtime();
+}
+
+/* ========= Rewards render ========= */
+function renderRewards(){
+  const data=state.rewards||{};
+  const html=Object.entries(data).map(([name,v])=>{
+    const active=String((v.Active==null?true:v.Active)).toLowerCase()!=='false'; if(!active) return '';
+    const need=Number((v.pointsRequired==null?0:v.pointsRequired));
+    const stock=Number((v.stock==null?0:v.stock));
+    const can=(state.total>=need && stock>0) && !lock && need>0;
+    const url=fixImg(v.imageUrl||v.ImageURL||v.Image||'');
+    const idForThumb=extractId(url);
+    return `<div class="reward">
+      <img loading="lazy" decoding="async"
+           src="${url||'https://via.placeholder.com/56?text=%20'}"
+           data-thumb="${idForThumb ? driveThumb(idForThumb) : ''}"
+           onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; this.dataset.thumb=''; } else { this.src='https://via.placeholder.com/56?text=%20'; }"
+           alt="${escapeHtml(name)}">
+      <div style="flex:1"><b>${escapeHtml(name)}</b><div class="muted">${fmt(need)} แต้ม • คงเหลือ ${fmt(stock)}</div></div>
+      <button class="btnRedeem" ${can?'':'disabled'} data-name="${escapeHtml(name)}" data-need="${need}">แลก</button>
+    </div>`;
+  }).join('') || '<div class="muted">— ไม่มีรายการ —</div>';
+  $('#rewards').innerHTML=html;
+  document.querySelectorAll('.btnRedeem').forEach(b=> b.onclick=()=>{ if(b.disabled) return; createQR(b.dataset.name, Number(b.dataset.need||0)); });
+}
+
+/* ========= Top 20 (dialog) ========= */
+$('#btnTop20').onclick = async () => {
+  try {
+    const FB = await ensureFirebase();
+    const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
+    const users = snap.val() || {};
+    const arr = Object.values(users).map(u => {
+      const name = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
+      const total = Number(u.PointsTotal ?? u.pointsTotal ?? (Number(u.PointsEarned ?? u.pointsEarned ?? 0) - Number(u.PointsUsed ?? u.pointsUsed ?? 0))) || 0;
+      return { name, total };
+    }).sort((a,b) => b.total - a.total).slice(0,20);
+    $('#dlgTopTitle').textContent='Top 20 คะแนนสะสม';
+    $('#dlgTopBody').innerHTML = arr.length ? arr.map((r,i)=> `#${i+1} ${escapeHtml(r.name)} — ${fmt(r.total)} แต้ม`).join('<br>') : '—';
+    $('#dlgTop').showModal();
+  } catch (e) {
+    console.error(e); $('#dlgTopTitle').textContent='Top 20 คะแนนสะสม'; $('#dlgTopBody').textContent='—'; $('#dlgTop').showModal();
   }
+};
 
-  appendSubmission_({ts:nowISO(),sap:sap,actId:actId,answer:answer,correct:correct,points:points,source:source||"web",category:act.Category,groupId:act.GroupId,finalized:finalized});
-  if(points>0){ writeUsersTotal_(sap,points,0); }
+/* ========= Activities realtime ========= */
+let actOpen=false, _autoTimer=null;
+function renderActList(){ $('#actList').innerHTML=''; $('#actList').style.display='none'; }
 
-  try{
-    var users=readUsers();
-    rtdbPut_("public/usersSummary",users);
-    var arr=[],k; for(k in users) if(users.hasOwnProperty(k)){ arr.push({sap:k,name:users[k].name||k,pts:num(users[k].pointsTotal)}); }
-    arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
-    rtdbPut_("public/leaderboard",arr.slice(0,20));
-  }catch(e){ log_("public_sync",String(e),{}); }
+function ensureActivitiesRealtime(){ (async ()=>{
+  const FB=await ensureFirebase(); const tk=todayKey(); const aref=FB.ref(FB.db,'public/activitiesByDate/'+tk);
+  FB.onValue(aref, async s=>{
+    let obj=s.val()||{}; let arr=Array.isArray(obj)? obj : Object.values(obj||{});
+    if(!arr.length){ try{ const r=await fetch(`${DB_URL}/public/activities.json?t=${Date.now()}`,{cache:'no-store'}); const all=(await r.json())||{}; arr=Object.values(all).filter(a=>{ const active=String((a.Active==null?'TRUE':a.Active)).toLowerCase()!=='false'; return active && isTodayAct(a); }); }catch{} }
+    state.activities=arr; state.activitiesMap={}; arr.forEach(a=>{ const gid=(a.GroupId||''); (state.activitiesMap[gid] ||= []).push(a); });
+    renderWeekly(); renderLatest(state.lastSubmission||readLatestCache()); checkActivity(); renderActList(); autoOpenOnceIfAvailable(); scheduleAutoPopup();
+  });
+})(); }
 
-  var out={ok:true,points:points,finalized:finalized};
-  if(reveal){ out.answerReveal=reveal; out.correct=(correct===true); }
-  return out;
+function extractDateKey(s){ const m=String(s||'').match(/\b(20\d{2}-\d{2}-\d{2})\b/); return m?m[1]:null; }
+function groupDate(a){ return extractDateKey(a.GroupId||a.groupId) || extractDateKey(a.ActID||a.id||a.actId); }
+function isTodayAct(a){ const k=todayKey(); const gd=groupDate(a); if(gd) return gd===k; return isTodayLocal(a.WindowStart) || isTodayLocal(a.WindowEnd); }
+
+function pickAct(){
+  const list=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{});
+  const cand=list.filter(a=>{ const active=String((a.Active==null?'TRUE':a.Active)).toLowerCase()!=='false'; if(!active) return false; const id=a.ActID||a.id||a.actId; if(!id) return false; if(!isTodayAct(a)) return false; if(hasAns(id)) return false; if(!isIn(a.WindowStart,a.WindowEnd)) return false; const pk=pairKeyOf(a); if(pk && clinPairAnswered(pk)) return false; return true; }).sort((x,y)=>parseLocal(x.WindowStart)-parseLocal(y.WindowStart));
+  if(!cand.length) return null;
+  const byPair={}; cand.forEach(a=>{ const pk=pairKeyOf(a); if(!pk) return; (byPair[pk]=byPair[pk]||[]).push(a); });
+  const pair=Object.entries(byPair).find(([pk,arr])=> arr.length>=2 && !clinPairAnswered(pk));
+  if(pair){ const list2=pair[1].slice(0,2).sort((x,y)=>parseLocal(x.WindowStart)-parseLocal(y.WindowStart)); return { twoStep:'clinPair', list:list2 }; }
+  return cand[0];
 }
 
-/* ===== Redeem / Confirm (หุ้ม LockService กัน race) ===== */
-function redeemReward_(sap,rewardName){
-  var lock = LockService.getDocumentLock(); lock.waitLock(30000);
-  try{
-    if(!sap) throw new Error("sap required");
-    if(!rewardName) throw new Error("rewardName required");
-    var users=readUsers(); if(!users[sap]) throw new Error("SAP not found");
-    var rewards=readRewards(); if(!rewards[rewardName]) throw new Error("Reward not found");
-    var need=num(rewards[rewardName].pointsRequired);
-    if(num(users[sap].pointsTotal)<need) throw new Error("คะแนนไม่เพียงพอ");
-    if(num(rewards[rewardName].stock)<=0) throw new Error("ของรางวัลหมด");
+function autoOpenOnceIfAvailable(force=false){ if(!state.sap || actOpen) return; const pick=pickAct(); if(!pick){ scheduleAutoPopup(); return; } const id= pick.twoStep==='clinPair' ? ('GROUP:'+pairKeyOf(pick.list[0])) : (pick.ActID||pick.id||pick.actId); const key=`anes.autopopup.${todayKey()}.${id}`; if(!force && sessionStorage.getItem(key)) return; sessionStorage.setItem(key,'1'); if(pick.twoStep==='clinPair') openActSelector(pick); else openAct(pick); }
+function scheduleAutoPopup(){ clearTimeout(_autoTimer); if(!state.sap) return; const now=Date.now(); const upcoming=getTodayActs().filter(a=>{ const id=a.ActID||a.id||a.actId; if(!id) return false; if(hasAns(id)) return false; const pk=pairKeyOf(a); if(pk && clinPairAnswered(pk)) return false; const st=parseLocal(a.WindowStart); return !Number.isNaN(st) && st>now; }).sort((a,b)=> parseLocal(a.WindowStart)-parseLocal(b.WindowStart)); if(!upcoming.length) return; const when=Math.max(250, parseLocal(upcoming[0].WindowStart)-now+200); _autoTimer=setTimeout(()=> autoOpenOnceIfAvailable(), when); }
+window.addEventListener('focus', ()=> autoOpenOnceIfAvailable());
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoOpenOnceIfAvailable(); });
+function getTodayActs(){ const l=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{}); return l.filter(isTodayAct); }
 
-    var st=adjustRewardStock_(rewardName,-1);
-    var after=writeUsersTotal_(sap,0,need);
-    appendRedemption_(sap,rewardName,need,st.before,st.after,"แลกผ่านหน้าเว็บ");
-
-    try{
-      rtdbPut_("public/rewards",readRewards());
-      var users2=readUsers();
-      rtdbPut_("public/usersSummary",users2);
-      var arr=[],k; for(k in users2) if(users2.hasOwnProperty(k)){ arr.push({sap:k,name:users2[k].name||k,pts:num(users2[k].pointsTotal)}); }
-      arr.sort(function(a,b){return num(b.pts)-num(a.pts);});
-      rtdbPut_("public/leaderboard",arr.slice(0,20));
-
-      var red=rtdbGet_("public/redemptions/"+sap)||[];
-      red.push({timestamp:nowISO(),sap:sap,rewardName:rewardName,points:need,status:"แลกผ่านหน้าเว็บ"});
-      rtdbPut_("public/redemptions/"+sap,red.slice(-100));
-    }catch(e){ log_("sync_after_redeem",String(e),{sap:sap,reward:rewardName}); }
-    return {ok:true,totalAfter:after.total,stockAfter:st.after};
-  } finally {
-    lock.releaseLock();
+/* ========= Winners ========= */
+function currentActForWinners(){ const acts=getTodayActs().slice().sort((a,b)=>(parseLocal(a.WindowStart)||0)-(parseLocal(b.WindowStart)||0)); if(!acts.length) return null; if(state.lastSubmission && acts.some(a=>(a.ActID||a.id||a.actId)===state.lastSubmission.actId)){ return acts.find(a=>(a.ActID||a.id||a.actId)===state.lastSubmission.actId); } const inwin=acts.find(a=> isIn(a.WindowStart,a.WindowEnd)); return inwin || acts[0]; }
+async function readJson(path){ try{ const r=await fetch(`${DB_URL}/${path}.json?t=${Date.now()}`,{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }catch{ return null; } }
+async function loadTop20Winners(today, actId){
+  const paths=[ actId?`public/winnersByDate/${today}/${encodeURIComponent(actId)}`:null, `public/winnersByDate/${today}` ].filter(Boolean);
+  for(const p of paths){ const data=await readJson(p); if(!data) continue; if(typeof data==='object'){ const arr=Object.values(data).flatMap(v=> Object.values(v||{})); if(arr.length){ arr.sort((a,b)=> new Date(a.ts||a.timestamp||0) - new Date(b.ts||b.timestamp||0)); const seen=new Set(); const out=[]; for(const it of arr){ const sap=it.sap||it.SAP; if(!sap || seen.has(sap)) continue; seen.add(sap); out.push({ sap:String(sap), ts: it.ts||it.timestamp||null }); if(out.length>=20) break; } return out; } }
   }
+  return [];
 }
-function confirmRedeem_(sap,rewardName,admin,ts,ptsFromClient){
-  var lock = LockService.getDocumentLock(); lock.waitLock(30000);
-  try{
-    if(!sap) throw new Error("sap required");
-    if(!rewardName) throw new Error("rewardName required");
-    if(!admin) throw new Error("admin required");
 
-    // ✅ QR validity = 10 minutes
-    if(!ts) throw new Error("QR ไม่ถูกต้อง (ไม่มีเวลา)");
-    var qrTime=new Date(ts).getTime();
-    if(!isFinite(qrTime)) throw new Error("เวลา QR ไม่ถูกต้อง");
-    if(Date.now()-qrTime > 10*60*1000) throw new Error("QR หมดอายุ (เกิน 10 นาที)");
+$('#btnWinners').onclick= async ()=>{
+  const today=todayKey(); const act=currentActForWinners(); const actId=act ? (act.ActID||act.id||act.actId) : null; const actTitle=act ? (act.Title||act.Question||actId||'') : '';
+  $('#dlgTopTitle').textContent = actTitle ? `Top 20 ผู้ตอบถูก (วันนี้) — ${actTitle}` : 'Top 20 ผู้ตอบถูก (วันนี้)';
+  const winners=await loadTop20Winners(today, actId);
+  if(winners.length){ $('#dlgTopBody').innerHTML = winners.slice(0,20).map((row,i)=> `#${i+1} SAP ${escapeHtml(row.sap)}${row.ts?` <span class="muted">(${escapeHtml(String(row.ts).replace('T',' ').slice(0,19))})</span>`:''}`).join('<br>'); } else { $('#dlgTopBody').textContent='—'; }
+  $('#dlgTop').showModal();
+};
 
-    var rewards=readRewards(), r=rewards[rewardName]; if(!r) throw new Error("Reward not found");
-    if(ptsFromClient && num(ptsFromClient)!==num(r.pointsRequired)) throw new Error("แต้มที่ต้องใช้ไม่ตรงกับระบบ");
+/* ========= Open activity UI ========= */
+function openActSelector(group){ const box=$('#chooseBody'); box.innerHTML=group.list.map((a,i)=>`<button class="ghost" data-i="${i}" style="flex:1">${escapeHtml(a.Title||('ตัวเลือก '+(i+1)))}</button>`).join(''); box.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{ const i=Number(btn.dataset.i||0); $('#chooseModal').style.display='none'; openAct(group.list[i]); }); $('#btnChooseClose').onclick=()=>$('#chooseModal').style.display='none'; $('#chooseModal').style.display='flex'; }
 
-    var users=readUsers(), u=users[sap]; if(!u) throw new Error("SAP not found");
-    var need=num(r.pointsRequired);
-    if(num(u.pointsTotal)<need) throw new Error("คะแนนไม่เพียงพอ");
-    if(num(r.stock)<=0) throw new Error("ของรางวัลหมด");
-
-    var st=adjustRewardStock_(rewardName,-1);
-    var after=writeUsersTotal_(sap,0,need);
-    appendRedemption_(sap,rewardName,need,st.before,st.after,"ยืนยันโดยแอดมิน: "+admin);
-
-    try{
-      // sync public
-      rtdbPut_("public/rewards",readRewards());
-      var users2=readUsers(); rtdbPut_("public/usersSummary",users2);
-      var arr=[]; for(var k in users2) if(users2.hasOwnProperty(k)){ arr.push({sap:k,name:users2[k].name||k,pts:num(users2[k].pointsTotal)}); }
-      arr.sort(function(a,b){return num(b.pts)-num(a.pts);}); rtdbPut_("public/leaderboard",arr.slice(0,20));
-
-      var red=rtdbGet_("public/redemptions/"+sap)||[];
-      red.push({timestamp:nowISO(),sap:sap,rewardName:rewardName,points:need,status:"ยืนยันโดยแอดมิน: "+admin});
-      rtdbPut_("public/redemptions/"+sap,red.slice(-100));
-
-      // ✅ ส่ง ack แจ้งไปยัง user
-      rtdbPut_("public/redeemAck/"+sap,{
-        timestamp: nowISO(),
-        rewardName: rewardName,
-        points: need,
-        admin: admin,
-        message: "ได้รับรางวัลแล้ว"
-      });
-    }catch(e){ log_("confirm_sync_err",String(e),{sap:sap,reward:rewardName}); }
-
-    return {ok:true,totalAfter:after.total,stockAfter:st.after};
-  } finally {
-    lock.releaseLock();
+function openAct(act){
+  actOpen=true; const id=act.ActID||act.id||act.actId; const t=String(act.InputType||'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  $('#actTitle').textContent=(act.Question||act.Title||''); $('#actQuestion').style.display='none'; $('#actQuestion').textContent=''; $('#actStatus').textContent=''; const box=$('#actOpts');
+  if(['NUM2','NUM','NUMBER','NUMERIC'].includes(t)) { box.innerHTML=`<input id="actText" placeholder="กรอกตัวเลข 2 หลัก" maxlength="2" inputmode="numeric" style="width:140px;text-align:center">`; setTimeout(()=>{ const inp=$('#actText'); try{ inp.focus(); }catch{}; inp.addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d]/g,'').slice(0,2)); inp.addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnActSubmit').click(); }); },0); }
+  else if(t==='TEXT') { box.innerHTML=`<input id="actText" placeholder="พิมพ์คำตอบ" style="width:100%">`; setTimeout(()=>{ try{$('#actText').focus();}catch{} },0); }
+  else {
+    const labels = ['A','B','C','D'];
+    const options = ['OptionA','OptionB','OptionC','OptionD'].map(k=>act[k]).filter(v=>v!=null&&String(v).trim()!=='');
+    box.innerHTML = options.length
+      ? options.map((t,i)=> {
+          const L = labels[i];
+          return `<label style="display:flex;gap:8px;align-items:flex-start;margin:6px 0">
+                    <input type="radio" name="actOpt" value="${L}">
+                    <span><b>${L}.</b> ${escapeHtml(String(t))}</span>
+                  </label>`;
+        }).join('')
+      : '<div class="muted">— ไม่มีตัวเลือก —</div>';
   }
-}
+  $('#actModal').style.display='flex';
 
-/* ===== Snapshots & Triggers (Debounce ไม่กองคิว) ===== */
-function refreshSnapshotsSafe_(){
-  try{ refreshSnapshots(); }catch(e){ log_("refresh_err",String(e),{}); }
-}
-function scheduleSync_(){
-  var p=PROP(), now=Date.now(), next=now+15000;
-  var until=Number(p.getProperty("SYNC_LOCK_UNTIL")||"0");
-  if(next <= until) return;
-  p.setProperty("SYNC_LOCK_UNTIL", String(next));
-  ScriptApp.newTrigger("debouncedSync_").timeBased().at(new Date(next)).create();
-}
-function debouncedSync_(){
-  var lock=LockService.getScriptLock();
-  if(!lock.tryLock(10000)) return;
-  try{
-    var p=PROP(), until=Number(p.getProperty("SYNC_LOCK_UNTIL")||"0");
-    if(Date.now() < until-500) return;
-    refreshSnapshotsSafe_();
-  }catch(e){ log_("debouncedSync",String(e),{}); }
-  finally{ lock.releaseLock(); }
-}
-/** triggers */
-function onEdit(e){ try{ scheduleSync_(); }catch(err){ log_("onEdit",String(err),{}); } }
-function onChange(e){ try{ scheduleSync_(); }catch(err){ log_("onChange",String(err),{}); } }
-function onOpen(){ try{
-  SpreadsheetApp.getUi().createMenu("Sianes")
-    .addItem("Refresh RTDB","refreshSnapshots")
-    .addItem("Run Debounced Sync","scheduleSync_")
-    .addToUi();
-} catch(e){} }
-function setupTriggersOnce(){
-  var ts=ScriptApp.getProjectTriggers(), i;
-  for(i=0;i<ts.length;i++){
-    var fn=ts[i].getHandlerFunction();
-    if(fn==="onChange" || fn==="onEdit" || fn==="debouncedSync_" || fn==="onOpen" || fn==="timeBackupSync_"){
-      ScriptApp.deleteTrigger(ts[i]);
+ $('#btnActSubmit').onclick = async () => {
+  if (_submitting) return;
+  _submitting = true;
+  try {
+    const id = act.ActID || act.id || act.actId;
+    const t  = String(act.InputType || 'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (hasAns(id)) {
+      $('#actStatus').textContent = 'คุณได้ตอบคำถามนี้แล้ววันนี้';
+      return;
     }
+
+    let ans;
+    if (['NUM2','NUM','NUMBER','NUMERIC','TEXT'].includes(t)) {
+      ans = ($('#actText').value || '').trim();
+      if (t !== 'TEXT' && !/^\d{2}$/.test(ans)) {
+        $('#actStatus').textContent = 'กรุณากรอกเลข 2 หลัก (00–99)';
+        try { $('#actText').focus(); } catch(_){}
+        return;
+      }
+    } else {
+      const chk = document.querySelector('input[name="actOpt"]:checked');
+      if (!chk) { $('#actStatus').textContent = 'กรุณาเลือกคำตอบ'; return; }
+      ans = String(chk.value || '').trim().toUpperCase();
+    }
+
+    markAns(id);
+    const pk = pairKeyOf(act); if (pk) markClinPair(pk);
+    localStorage.setItem('anes.act.lastAns.' + id + '.' + (state.sap || ''), ans);
+
+    const key = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    const ts  = new Date().toISOString();
+    const payload = { sap: state.sap, actId: id, answer: ans, timestamp: ts, client: 'web-anesa+' };
+
+    const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
+    const hasAnswer = String(act.Answer || '').trim() !== '';
+    const instantOK = (!isNumeric && hasAnswer) ? clientIsCorrect(act, ans) : null;
+    const instantPts = (instantOK === true) ? (Number(act.BasePoints||0) + Number(act.CorrectBonus||0)) : 0;
+    const optimistic = {
+      actId: id,
+      title: (act.Title || id),
+      ts: ts,
+      correct: instantOK,
+      points: (instantOK === true ? instantPts : 0),
+      userAnswer: ans,
+      Finalized: false
+    };
+    state.lastSubmission = optimistic;
+    renderLatest(optimistic);
+    addOrUpdateWeekly({ dateISO: ts, title: optimistic.title, actId: id, result: optimistic.correct, points: optimistic.points, Finalized: false });
+
+    $('#actModal').style.display = 'none';
+    actOpen = false;
+    toast('✅ ส่งคำตอบแล้ว', 1200);
+    $('#btnActNow').disabled = true;
+    checkActivity();
+
+    // ส่งเข้าคิว RTDB (no-preflight)
+    try {
+      await fetch(DB_URL + '/public/answersQueue/' + encodeURIComponent(key) + '.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch(_) {}
+
+    // ให้ Apps Script ประมวลผลคิว + บันทึก + บวกแต้ม
+    let server = null;
+    try{
+      const r = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action:'queue:process', key, item: payload })
+      });
+      server = await r.json();
+    }catch(_){}
+
+    if (server && server.ok) {
+      const final = {
+        actId: id,
+        title: optimistic.title,
+        ts: ts,
+        correct: (server.correct === 'TRUE' ? true : (server.correct === 'FALSE' ? false : null)),
+        points: Number(server.points || 0),
+        userAnswer: ans,
+        Finalized: (server.correct !== 'PENDING')
+      };
+      state.lastSubmission = final;
+      renderLatest(final);
+      addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: final.Finalized });
+    } else {
+      // Fallback: ยิงตรงไป Apps Script (ฟังก์ชัน global จะจัดการโหมด file:/// ให้)
+      window.postSubmissionToSheet(payload).then((res)=>{
+        if (res && res.ok){
+          const final = {
+            actId: id, title: optimistic.title, ts: ts,
+            correct: (res.correct === 'TRUE' ? true : (res.correct === 'FALSE' ? false : null)),
+            points: (res.points == null ? 0 : Number(res.points)),
+            userAnswer: ans, Finalized: true
+          };
+          state.lastSubmission = final;
+          renderLatest(final);
+          addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: true });
+        }
+      }).catch(()=>{});
+    }
+
+  } catch (err) {
+    console.error(err);
+    $('#actStatus').textContent = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+  } finally {
+    _submitting = false;
   }
-  ScriptApp.newTrigger("onChange").forSpreadsheet(SPREADSHEET_ID).onChange().create();
-  ScriptApp.newTrigger("onEdit").forSpreadsheet(SPREADSHEET_ID).onEdit().create();
-  ScriptApp.newTrigger("timeBackupSync_").timeBased().everyMinutes(5).create();
+};
+
+  $('#btnActClose').onclick=()=>{ $('#actModal').style.display='none'; actOpen=false; };
 }
-function timeBackupSync_(){ try{ refreshSnapshotsSafe_(); }catch(e){ log_("timeBackupSync",String(e),{}); } }
+
+function renderLatest(x){
+  const box=$('#actLatest'); const isTodayTs=ts=>{ if(!ts) return false; const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); };
+  const acts=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{});
+  const hasTodayData=obj=> !!obj && ( isTodayTs(obj.ts) || (!!obj.actId && acts.some(a=>(a.ActID||a.id||a.actId)===obj.actId)) );
+  const data=hasTodayData(x)? x : readLatestCache(); if(!hasTodayData(data)) return; saveLatestCache(data);
+  const act=acts.find(a=>(a.ActID||a.id||a.actId)===data.actId) || {}; const your=(data.userAnswer || localStorage.getItem(`anes.act.lastAns.${data.actId||''}.${state.sap||''}`) || '—')+''; const ansKey=(act.Answer||'')+'';
+  const mapAnswerText = (act, raw) => {
+     const K = String(raw||'').trim().toUpperCase();
+     const optMap = {A:act.OptionA, B:act.OptionB, C:act.OptionC, D:act.OptionD};
+     if(['A','B','C','D'].includes(K)){
+       const t = optMap[K];
+       return t ? `${K}. ${t}` : K;
+     }
+     const L = choiceLetterOf_(raw);
+     if(L){
+       const t = optMap[L];
+       return t ? `${L}. ${t}` : raw;
+     }
+    return raw;
+  };
+
+  const ansText=ansKey ? mapAnswerText(act, ansKey) : '';
+  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">❌ ไม่ถูก</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
+  const qText=(act.Question||act.Title||data.title||data.actId||'-')+'';
+  const html=`<div><b>คำถามวันนี้:</b> ${escapeHtml(qText)}</div><div><b>คำตอบของคุณ:</b> ${escapeHtml(your)} • ${verdict}</div>`;
+  box.innerHTML=html; box.style.display='block';
+}
+
+function checkActivity(){ if(!state.sap){ $('#actTodayCard').style.display='none'; return; } $('#actTodayCard').style.display='block'; const pick=pickAct(); $('#btnActNow').disabled=!pick; renderActList(); }
+$('#btnActNow').onclick=()=>{ const pick=pickAct(); if(!pick){ $('#btnActNow').disabled=true; return; } if(pick.twoStep==='clinPair'){ openActSelector(pick); } else { openAct(pick); } };
+
+function mapWeeklyRow(it){ const dateText=String(it.dateISO||it.ts||it.timestamp||it.Date||it.date||it.time||''); const actId=String(it.actId||it.ActID||it.ActivityId||it.activityId||it.setId||it.GroupId||it.FormId||''); let title=String(it.title||it.Title||it.ActivityTitle||it.FormTitle||it.name||it.question||''); if(!title && actId){ const meta=getActMetaById(actId); if(meta) title=meta.Title||meta.Question||''; } const r=(it.result ?? it.Result ?? it.correct ?? it.Correct); let result=null; if(r===true || String(r).toLowerCase()==='true' || String(r)==='1') result=true; if(r===false || String(r).toLowerCase()==='false' || String(r)==='0') result=false; const points=Number(it.points ?? it.Points ?? it.point ?? it.award ?? it.Award ?? it.pointsAwarded ?? it.Score ?? 0) || 0; return { dateText, actId, title, result, points }; }
+
+async function wireWeeklyRealtime(){
+  const FB=await ensureFirebase();
+  const paths=[ `public/weeklyByUser/${state.sap}`, `public/FormAwardsByUser/${state.sap}`, `public/formAwardsByUser/${state.sap}` ];
+  paths.forEach(p=>{ onValue(ref(FB.db,p), snap=>{ const obj=snap.val()||{}; const arr=Array.isArray(obj)? obj : Object.values(obj); if(!arr.length) return; state.weeklyRemote=arr.map(mapWeeklyRow); renderWeekly(); }); });
+  onValue(ref(FB.db,'public/FormAwards'), snap=>{ const obj=snap.val()||{}; const arr=Object.values(obj).filter(it=> String(it.sap||it.SAP||it.user||it.userId||'')===String(state.sap||'')); if(!arr.length) return; state.weeklyRemote=arr.map(mapWeeklyRow); renderWeekly(); });
+}
+
+/* ========= Annual realtime ========= */
+state.offAnnual && state.offAnnual();
+async function wireAnnualRealtime(){ const FB=await ensureFirebase(); const r=ref(FB.db,'public/annualByUser/'+state.sap); state.offAnnual = onValue(r, snap=>{ const val=snap.val()||{}; const arr=Array.isArray(val)? val : Object.entries(val).map(([k,v])=>({_key:k,...v})); state.annual = arr.filter(Boolean).sort((a,b)=> new Date(b.timestamp||b.awardedAt||0) - new Date(a.timestamp||a.awardedAt||0)).slice(0,200); renderAnnual(); }); }
+
+/* ========= Auto restore ========= */
+(function restoreSession(){ const sess=readSession(); if(!sess||!sess.sap) return; state.sap=sess.sap; state.name=sess.name||sess.sap; setWelcome(state.name); document.body.classList.remove('is-login'); $('#loginBox').style.display='none'; $('#btnLogout').style.display='inline-block'; $('#actTodayCard').style.display='block'; renderLatest(readLatestCache()); clearAutoPopupFlags(); attachRealtime(); autoOpenOnceIfAvailable(true); scheduleAutoPopup(); })();
+
+/* ========= Heartbeat ========= */
+setInterval(()=>{ if(!state.sap) return; try{ if(!actOpen){ checkActivity(); autoOpenOnceIfAvailable(); } }catch{} }, 5000);
+
+// ===== Client-side correctness helper (instant MCQ) =====
+function _normStr(s){
+  return String(s||'').replace(/[.\u200b]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function stripChoicePrefix_(s){
+  return String(s||'').replace(/^\s*([A-Dก-ง])[\.\)]?\s*/i,'');
+}
+function choiceLetterOf_(s){
+  const t = String(s||'').trim();
+  const m = t.match(/^([A-D])[\.\)]?/i) || t.match(/^([ก-ง])[\.\)]?/);
+  return m ? m[1].toUpperCase() : '';
+}
+
+function clientIsCorrect(meta, userAns){
+  const cat = String(meta.Category||'');
+  if(/DAY(1|16)_LOTTO/i.test(cat)){
+    const u2 = String(userAns||'').replace(/\D/g,'').slice(-2);
+    const a2 = String(meta.Answer||'').replace(/\D/g,'').slice(-2);
+    return (u2 && a2 && u2===a2);
+  }
+  const a = _normStr(stripChoicePrefix_(meta.Answer));
+  const u = _normStr(userAns);
+  if(u && a && u===a) return true;
+  const letterMap = {A:'OptionA',B:'OptionB',C:'OptionC',D:'OptionD','ก':'OptionA','ข':'OptionB','ค':'OptionC','ง':'OptionD'};
+  if(u.length===1){
+    const keyRaw = String(userAns||'').trim();
+    const key = letterMap[keyRaw.toUpperCase()] || letterMap[keyRaw];
+    const full = key ? _normStr(stripChoicePrefix_(meta[key]||'')) : '';
+    if(full && full===a) return true;
+  }
+  const ansLetter = choiceLetterOf_(meta.Answer);
+  if(ansLetter){
+    if(String(userAns||'').trim().toUpperCase() === ansLetter) return true;
+    const opt = letterMap[ansLetter];
+    const full = opt ? _normStr(stripChoicePrefix_(meta[opt]||'')) : '';
+    if(full && _normStr(userAns) === full) return true;
+  }
+  return false;
+}
+
+</script>
+</body>
+</html>
