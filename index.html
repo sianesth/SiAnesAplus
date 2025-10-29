@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>ANESA+ — User (latest)</title>
+<title>ANESA+ — Session 1</title>
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
 <style>
@@ -207,9 +207,33 @@ body.is-login #loginBox{
 
 body.is-login .login-card{
   /* กัน CSS อื่นทับค่า: ถ้ายังชิดอยู่ ให้การ์ดมีระยะเองด้วย */
-  margin-top: 48px !important;
+  margin-top: 24px !important;
 }
 
+/* ===== Top20 table ===== */
+.top20-table thead th{ text-align:center !important; }  /* หัวตารางชิดกลาง */
+
+.top20-table th:nth-child(1),
+.top20-table td:nth-child(1),
+.top20-table th:nth-child(3),
+.top20-table td:nth-child(3){
+  width:76px;           /* ปรับเป็น 70/80 ได้ */
+  text-align:center;
+}
+
+/* มือถือ/แท็บเล็ตให้เล็กลงนิด */
+@media (max-width:720px){
+  .top20-table th:nth-child(1),
+  .top20-table td:nth-child(1),
+  .top20-table th:nth-child(3),
+  .top20-table td:nth-child(3){ width:70px }
+}
+@media (max-width:420px){
+  .top20-table th:nth-child(1),
+  .top20-table td:nth-child(1),
+  .top20-table th:nth-child(3),
+  .top20-table td:nth-child(3){ width:64px }
+}
 </style>
 
 </head>
@@ -292,7 +316,7 @@ body.is-login .login-card{
   <section id="historyBox" class="card" style="display:none">
     <h3>📄 ประวัติการแลก</h3>
     <table>
-      <thead><tr><th>เวลา</th><th>รางวัล</th><th>แต้ม</th><th>สถานะ</th></tr></thead>
+      <thead><tr><th>วดป</th><th>รางวัล</th><th>แต้ม</th><th>สถานะ</th></tr></thead>
       <tbody id="history"><tr><td colspan="4" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
@@ -318,11 +342,15 @@ body.is-login .login-card{
 
 <div id="top20Modal" class="modal" style="display:none">
   <div class="modal-card">
-    <h3>Top 20 คะแนนสะสม</h3>
+    <h3>Top 20 แต้มสะสม</h3>
     <table>
       <thead>
-        <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th style="text-align:right">คะแนน</th></tr>
-      </thead>
+         <tr>
+           <th style="width:64px;text-align:center">ลำดับ</th>
+           <th>ชื่อ-นามสกุล</th>
+           <th style="width:120px;text-align:right">แต้ม</th>
+         </tr>
+      </thead
       <tbody id="top20List"><tr><td colspan="3" class="muted">—</td></tr></tbody>
     </table>
     <button onclick="hideModalTop20()">ปิด</button>
@@ -370,7 +398,7 @@ body.is-login .login-card{
 </div></div>
 
 <dialog id="dlgTop"><div style="min-width:320px">
-  <h3 id="dlgTopTitle">Top 20 คะแนนสะสม</h3>
+  <h3 id="dlgTopTitle">Top 20 แต้มสะสม</h3>
   <div id="dlgTopBody"></div>
   <div style="text-align:right;margin-top:8px"><button onclick="this.closest('dialog').close()">ปิด</button></div>
 </div></dialog>
@@ -379,6 +407,7 @@ body.is-login .login-card{
 
 <footer style="text-align:center;color:#8b94b2;font-size:12px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล
+
 </footer>
 
 <script type="module">
@@ -634,14 +663,22 @@ async function attachRealtime(){
   await preloadAllActivities();
 
   onValue(ref(FB.db,'public/usersSummary/'+state.sap), s=>{
-    const v=s.val()||{};
-    state.total=Number(v.pointsTotal||v.PointsTotal||0);
-    ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox'].forEach(id=>$('#'+id).style.display='block');
-    $('#uEarned').textContent=fmt(v.pointsEarned||v.PointsEarned||0);
-    $('#uUsed').textContent=fmt(v.pointsUsed||v.PointsUsed||0);
-    $('#uTotal').textContent=fmt(v.pointsTotal||v.PointsTotal||0);
-    renderRewards(); lock=loadLock(); applyBanner(); if(lock) openQR(lock,true); renderWeekly();
-  });
+  const v=s.val()||{};
+  state.total = Number(v.pointsTotal||v.PointsTotal||0);
+  ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
+    .forEach(id=>$('#'+id).style.display='block');
+  $('#uEarned').textContent=fmt(v.pointsEarned||v.PointsEarned||0);
+  $('#uUsed').textContent  =fmt(v.pointsUsed  ||v.PointsUsed  ||0);
+  $('#uTotal').textContent =fmt(v.pointsTotal ||v.PointsTotal ||0);
+
+  // โหลด lock ก่อน แล้วค่อยเรนเดอร์ เพื่อไม่ให้เฟรมแรก enable
+  lock = loadLock();
+  applyBanner();
+  if (lock) openQR(lock, true);
+
+  renderRewards();          // เรียกหลังจาก lock พร้อมแล้ว
+  renderWeekly();
+});
 
   onValue(ref(FB.db,'public/redemptions/'+state.sap), s=>{
     const arr=s.val()||[];
@@ -672,8 +709,17 @@ function renderRewards(){
     const active=String((v.Active==null?true:v.Active)).toLowerCase()!=='false'; if(!active) return '';
     const need=Number((v.pointsRequired==null?0:v.pointsRequired));
     const stock=Number((v.stock==null?0:v.stock));
-    const can=(state.total>=need && stock>0) && !lock && need>0;
-    const url=fixImg(v.imageUrl||v.ImageURL||v.Image||'');
+    const lockNow = (lock ?? loadLock());
+    const can = (state.total >= need && stock > 0 && !lockNow && need > 0);
+    const raw = (v.imageUrl||v.ImageURL||v.Image||'');
+    const url = (()=>{
+        const u = fixImg(raw);
+        if(!u) return '';
+        const join = u.includes('?') ? '&' : '?';
+        // ใช้ UpdatedAt เป็น cache-buster
+        return u + join + 'v=' + encodeURIComponent(v.UpdatedAt || '');
+      })();
+
     const idForThumb=extractId(url);
     return `<div class="reward">
       <img loading="lazy" decoding="async"
@@ -696,7 +742,6 @@ $('#btnTop20').onclick = async () => {
     const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
     const users = snap.val() || {};
 
-    // คำนวณอันดับจากคะแนนรวม แต่ "ไม่แสดงคะแนน"
     const top = Object.values(users).map(u => {
       const name  = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
       const total = Number(
@@ -706,23 +751,31 @@ $('#btnTop20').onclick = async () => {
       return { name, total };
     }).sort((a,b) => b.total - a.total).slice(0,20);
 
-    // เรนเดอร์ตาราง 2 คอลัมน์: ลำดับ, ชื่อ-นามสกุล
-    const cols = ['ลำดับ','ชื่อ-นามสกุล'];
-    const rows = top.map((r,i) => [String(i+1), String(r.name || '-')]);
+    const thead = `
+      <thead>
+        <tr>
+          <th>ลำดับ</th>
+          <th>ชื่อ-นามสกุล</th>
+          <th>จำนวนแต้ม</th>
+        </tr>
+      </thead>`;
 
-    const thead = `<thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
     const tbody = `<tbody>${
-      rows.map(r => `<tr>${
-        r.map((c,i) => `<td${i===0 ? ' style="width:80px;text-align:center"' : ''}>${escapeHtml(c)}</td>`).join('')
-      }</tr>`).join('')
+      top.map((r,i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td>${escapeHtml(r.name || '-')}</td>
+          <td>${fmt(r.total)}</td>
+        </tr>
+      `).join('')
     }</tbody>`;
 
-    $('#dlgTopTitle').textContent = 'Top 20 คะแนนสะสม';
-    $('#dlgTopBody').innerHTML = `<table style="width:100%;border-collapse:collapse">${thead}${tbody}</table>`;
+    $('#dlgTopTitle').textContent = 'Top 20 แต้มสะสม';
+    $('#dlgTopBody').innerHTML = `<table class="top20-table">${thead}${tbody}</table>`;
     $('#dlgTop').showModal();
   } catch (e) {
     console.error(e);
-    $('#dlgTopTitle').textContent = 'Top 20 คะแนนสะสม';
+    $('#dlgTopTitle').textContent = 'Top 20 แต้มสะสม';
     $('#dlgTopBody').textContent = '—';
     $('#dlgTop').showModal();
   }
@@ -831,8 +884,8 @@ $('#btnWinners').onclick = async () => {
   const actTitle = act ? (act.Title||act.Question||actId||'') : '';
 
   $('#dlgTopTitle').textContent = actTitle
-    ? `Top 20 ผู้ตอบถูก (วันนี้) — ${actTitle}`
-    : 'Top 20 ผู้ตอบถูก (วันนี้)';
+    ? `Top 20 (วันนี้) — ${actTitle}`
+    : 'Top 20 (วันนี้)';
 
   const table = await fetchWinnersTable(today, actId);
 
@@ -843,7 +896,11 @@ $('#btnWinners').onclick = async () => {
         r.map((c,i)=> `<td${i===0? ' style="width:80px;text-align:center"':''}>${escapeHtml(String(c))}</td>`).join('')
       }</tr>`).join('')
     }</tbody>`;
-    $('#dlgTopBody').innerHTML = `<table style="width:100%;border-collapse:collapse">${thead}${tbody}</table>`;
+    $('#dlgTopBody').innerHTML =
+  `<table class="top20-table">
+     ${thead}
+     ${tbody}
+   </table>`;
   } else {
     $('#dlgTopBody').innerHTML = '—';
   }
