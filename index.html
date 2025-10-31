@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
 <style>
-  /* ---------- ตัวแปรหลัก ---------- */
+
   /* ========== Base variables ========== */
 :root{
   --bg:#f6f8fd; --card:#fff; --line:#e6e9f2; --txt:#0f1733; --muted:#6b78a6;
@@ -40,7 +40,7 @@ header{
 header img{ height:44px; width:auto }
 .brand{ display:flex; flex-direction:column; line-height:1.15 }
 .brand .sys{ font-size:24px; font-weight:800; letter-spacing:.2px }
-.brand .welcome{ font-size:13px; color:#cdd4f0 }
+.brand .welcome{ font-size:14px; color:#e6eefc; font-weight:600 }
 .spacer{ flex:1 }
 
 /* Logout button (icon) */
@@ -148,17 +148,44 @@ body.is-login{ overflow:hidden; }
 #btnLogin:hover{ transform:translateY(-1px); filter:brightness(1.03); box-shadow:0 12px 24px rgba(59,130,246,.3) }
 @keyframes floaty{ 0%,100%{ transform:translateY(-2px) } 50%{ transform:translateY(2px) } }
 
-/* ดันหน้า Login ลงจากเฮดเดอร์ (ปรับตัวเลขได้) */
-body.is-login main{ margin-top:calc(var(--header-h) + 140px) !important; } /* อยากลงมากขึ้น/น้อยลง ปรับ 120 */
+:root{
+  /* …ตัวแปรเดิม… */
+  --logo-size: 260px;   /* ขนาดโลโก้ (ปรับได้) */
+  --logo-bob:  16px;    /* ระยะเด้งขึ้นลง (ปรับได้) */
+}
+
+/* โลโก้ */
+.login-logo{
+  width: var(--logo-size);
+  height: var(--logo-size);
+  object-fit: contain;
+  margin: 0 auto 6px;
+  display: block;
+  animation: floaty 3.6s ease-in-out infinite;
+}
+
+/* เด้งขึ้นลงเยอะขึ้น โดยอิงตัวแปรด้านบน */
+@keyframes floaty{
+  0%,100% { transform: translateY(calc(var(--logo-bob) * -1)); }
+  50%     { transform: translateY(var(--logo-bob)); }
+}
+
+/* ถ้าหน้าจอเล็ก อยากย่อโลโก้ลงนิดหน่อย */
+@media (max-width:520px){
+  .login-logo{
+    --logo-size: 160px;
+    --logo-bob: 12px;
+  }
+}
 
 /* ========== KPI section ========== */
 #kpiBox{ padding-top:8px; }
 #kpiBox > h3{ margin:0 0 6px; }
 #kpiBox .kpiRow{
-  display:flex; align-items:center; gap:12px; margin-top:2px;
+  display:flex; align-items:center; gap:8px; margin-top:2px;
 }
 .kpi{
-  min-width:136px; padding:10px 14px; text-align:center;
+  min-width:96px; padding:6px 8px; text-align:center;
   border:1px solid var(--line); border-radius:12px;
   box-shadow:inset 0 2px 8px rgba(15,23,51,.05);
 }
@@ -188,8 +215,8 @@ body.is-login main{ margin-top:calc(var(--header-h) + 140px) !important; } /* �
   #sap{ width:150px; height:40px }
   #btnLogin{ height:40px; padding:0 16px }
   .login-logo{ width:80px; height:80px }
-  .kpi{ min-width:120px; padding:8px 10px }
-  .kpi .value{ font-size:20px }
+  .kpi{ min-width:92px; padding:6px 8px }
+  .kpi .value{ font-size:18px }
   #btnLogout.icon-btn{ width:32px; height:32px; border-radius:10px }
   #btnLogout.icon-btn svg{ width:18px; height:18px }
 }
@@ -350,7 +377,7 @@ body.is-login .login-card{
            <th>ชื่อ-นามสกุล</th>
            <th style="width:120px;text-align:right">แต้ม</th>
          </tr>
-      </thead
+      </thead>
       <tbody id="top20List"><tr><td colspan="3" class="muted">—</td></tr></tbody>
     </table>
     <button onclick="hideModalTop20()">ปิด</button>
@@ -411,6 +438,7 @@ body.is-login .login-card{
 </footer>
 
 <script type="module">
+window.state = window.state || { sap: "", weeklyRemote: [], offWeekly: null };
 /* ========= Config ========= */
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
 const { getDatabase, ref, onValue, get, off, child } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
@@ -426,11 +454,15 @@ const app = initializeApp({
 const DB_URL = "https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app";
 const ADMIN_PAGE_URL = "https://sianesth.github.io/Admin_reward/"; 
 // ⬇️ IMPORTANT: อัปเดตเป็น URL ของ Web App (Deployment ล่าสุด) ลงท้ายด้วย /exec
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDO2uXrgEAk3Uq9KPNpihQeMJzZWrS45nTkgjO8ZgsGErisAvHAICCKy6MCFUz935L/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOW_Wk7bZYb3zG4qRciOENbBSMo2TRdfdJxXzC1C5tRxav1R_dlF5SuuXKoEkJi84Ig/exec';
 
+// ===== ใส่แทนที่ฟังก์ชันเดิมทั้งบล็อก =====
 async function postSubmissionToSheet(payload) {
-  const url = SCRIPT_URL;
-  if (!url) return { ok: false, error: 'SCRIPT_URL missing' };
+  const url = (typeof SCRIPT_URL !== 'undefined') ? SCRIPT_URL : '';
+  if (!url) {
+    console.error('SCRIPT_URL missing');
+    return { ok: false, error: 'SCRIPT_URL missing' };
+  }
 
   try {
     const res = await fetch(url, {
@@ -439,39 +471,174 @@ async function postSubmissionToSheet(payload) {
       keepalive: false,
       cache: 'no-store'
     });
-    const data = await res.json();
 
-    // ✅ แสดงผลได้ทันที
-    if (data.ok && data.correct) {
-      if (data.correct === "TRUE") {
-        showAnswerResult(true, data.points);
-      } else if (data.correct === "FALSE") {
+    // บางครั้ง GAS จะส่ง 200 พร้อม body ว่าง/ไม่ใช่ JSON → กันไว้
+    let data = null;
+    try { data = await res.json(); } catch (_) { data = null; }
+
+    // ====== กันตอบซ้ำ (ฝั่ง client) เมื่อเซิร์ฟเวอร์แจ้งว่าตอบไปแล้ว ======
+    if (data && (data.error === 'already_answered_today' || data.errorCode === 'ALREADY_ANSWERED')) {
+      try {
+        const actId = String(payload.actId || '').trim();
+        if (actId) {
+          const today = todayKey('Asia/Bangkok'); // ใช้โซนไทย
+          const SAP   = localStorage.getItem('SAP') || (state && state.sap) || '';
+          const key   = `ans:${today}:${SAP}:${actId}`;
+          localStorage.setItem(key, '1');          // กันซ้ำแบบ ans:YYYY-MM-DD:SAP:ActID
+          try { localStorage.setItem(aKey(actId), '1'); } catch (e) {}
+
+          // ถ้ามีคู่ clinic/non-clinic ให้ปิดชุดนั้นด้วย
+          try {
+            const meta = (typeof getActMetaById === 'function') ? getActMetaById(actId) : null;
+            const pk = meta && (typeof pairKeyOf === 'function') ? pairKeyOf(meta) : null;
+            if (pk && typeof clinPairStoreKey === 'function') {
+              localStorage.setItem(clinPairStoreKey(pk), '1');
+            }
+          } catch (e) {}
+
+          // ยิงค่าเข้า RTDB เพื่อเสริมความชัวร์
+          try {
+            await fetch(`${DB_URL}/public/answeredToday/${today}/${encodeURIComponent(actId)}/${encodeURIComponent(SAP)}.json`, {
+              method: 'PUT',
+              body: 'true'
+            });
+          } catch (_) {}
+        }
+      } catch (e) {}
+
+      try { document.querySelector('#actModal').style.display = 'none'; } catch (e) {}
+      if (typeof toast === 'function') toast('วันนี้คุณตอบกิจกรรมนี้แล้ว', 3000);
+      return { ok: false, error: 'already_answered_today' };
+    }
+
+    // ====== แจ้ง Non-active ======
+    if (data && data.error === 'USER_NON_ACTIVE') {
+      if (typeof toast === 'function') {
+        toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
+      }
+      return { ok: false, error: 'USER_NON_ACTIVE' };
+    }
+
+    // ====== แสดงผลลัพธ์ทันทีถ้า server ให้สถานะ correct กลับมา ======
+    if (data && data.ok && data.correct != null && typeof showAnswerResult === 'function') {
+      if (data.correct === 'TRUE') {
+        showAnswerResult(true, Number(data.points || 0));
+      } else if (data.correct === 'FALSE') {
         showAnswerResult(false, 0);
       } else {
-        showAnswerResult(null, 0);
+        showAnswerResult(null, 0); // PENDING
       }
     }
 
-    // ⬅️ รองรับ error USER_NON_ACTIVE จาก server
-    if (data && data.error === 'USER_NON_ACTIVE') {
-      toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
-    }
+    // ส่งต่อผลลัพธ์ให้ผู้เรียกใช้งาน
+    if (data) return data;
 
-    return data || { ok: true, correct: 'PENDING', points: null };
+    // fallback เผื่อ body ว่าง
+    return { ok: true, correct: 'PENDING', points: null };
+
   } catch (e) {
     console.error('Submit error:', e);
     return { ok: false, error: String(e) };
   }
 }
 
+// แปลงค่า Status จากชีทให้เป็น boolean
+function isActiveStatus(val){
+  // รองรับทั้ง "active", "non-active", TRUE/FALSE, 1/0, ไทย/อังกฤษ
+  const s = String(val ?? '').normalize('NFKC').trim().toLowerCase();
+  if (typeof val === 'boolean') return val;
+  if (!s) return false;                                       // ค่าว่าง = ไม่อนุญาต
+  if (/^(inactive|non-?active|disabled?|false|0|ปิด|งด|หยุด)$/.test(s)) return false;
+  if (/^(active|enabled?|true|1|เปิด|ใช้งาน|on|yes)$/.test(s)) return true;
+  return !(s.startsWith('non'));                              // กันกรณีสะกดแปลกๆ
+}
+
 /* ========= Tiny helpers ========= */
 const $ = q => document.querySelector(q);
+function gasJSONP(params){
+  return new Promise((resolve,reject)=>{
+    const cb='cb_'+Math.random().toString(36).slice(2);
+    window[cb]=d=>{ resolve(d); delete window[cb]; s.remove(); };
+    const qs=new URLSearchParams({...params, callback:cb}).toString();
+    const s=document.createElement('script'); s.src=`${SCRIPT_URL}?${qs}`;
+    s.onerror=()=>reject(new Error('GAS JSONP error'));
+    document.body.appendChild(s);
+  });
+}
+  
+async function hasAnswered(sap, actId){
+  const r = await gasJSONP({act:'answered', sap, actId});
+  return !!(r && r.ok && r.answered);
+}
+
 const fmt = n => Number(n||0).toLocaleString('th-TH');
 const pad2 = n => String(n).padStart(2,'0');
 function toast(html,ms=3000){ const el=$('#toast'); el.innerHTML=html; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),ms); }
 function setWelcome(name){const el=$('#welcomeText'); if(name){ el.textContent='ยินดีต้อนรับคุณ '+name; el.style.display='block'; } else { el.style.display='none'; } }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function todayKey(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+// ใช้คีย์วันที่ตามโซนเวลาไทยเสมอ
+function todayKey(tz = 'Asia/Bangkok') {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return fmt.format(new Date()); // YYYY-MM-DD
+}
+
+// ฟังก์ชันสำรอง: ใช้ถ้าต้องเรียกวันอื่น (optional)
+function dayKeyFromDate(d, tz = 'Asia/Bangkok') {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return fmt.format(d);
+}
+
+// === Date helpers (รับได้ทั้ง ISO, 'YYYY-MM-DD HH:mm:ss', 'DD/MM/YYYY, HH:MM:SS', serial day) ===
+function anyToDate(x){
+  if (x instanceof Date) return x;
+  if (x == null || x === '') return null;
+
+  if (typeof x === 'number') {
+    if (x > 25569 && x < 60000) return new Date((x - 25569) * 86400 * 1000); // serial day
+    return new Date(x);
+  }
+
+  const s = String(x).trim();
+  if (!s) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?$/.test(s)){
+    const fix = s.replace(/([+\-]\d{2})(\d{2})$/,'$1:$2'); // +0700 -> +07:00
+    const d = new Date(fix);
+    return isNaN(+d) ? null : d;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+    return new Date(s.replace(' ','T') + '+07:00');
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}[, ] \d{1,2}:\d{2}:\d{2}$/.test(s)) {
+    const m = s.replace(',', '').match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{1,2}:\d{2}:\d{2})$/);
+    if (m) return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}+07:00`);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00+07:00');
+
+  const d = new Date(s);
+  return isNaN(+d) ? null : d;
+}
+
+function thaiDate(d){
+  if (!d) return 'Invalid Date';
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yyyy = d.getFullYear() + 543;
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function thaiFromKeys(obj, keys){
+  for (const k of keys){
+    if (obj && obj[k] != null && String(obj[k]).trim() !== ''){
+      const d = anyToDate(obj[k]);
+      if (d) return thaiDate(d);
+    }
+  }
+  return 'Invalid Date';
+}
 
 // Google Drive image helpers
 function extractId(u){ const s=String(u||""); if(!s) return ""; const m = s.match(/\/d\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/); return m&&m[1]?m[1]:""; }
@@ -498,6 +665,43 @@ let state={ sap:null,total:0,name:'', leader:[], rewards:{}, activities:[], acti
 let fb=null; let actIndex={};
 let _submitting = false;
 
+// ==== Pending KPI (สำหรับโชว์ทันทีแบบ Optimistic) ====
+state._kpiServer = { earned:0, used:0, total:0 };   // ตัวเลขจาก RTDB ล่าสุด
+state._kpiPending = { earned:0, used:0, total:0 };  // ตัวเลขค้างรอยืนยัน
+
+function renderKPI(){
+  const earned = state._kpiServer.earned + state._kpiPending.earned;
+  const used   = state._kpiServer.used   + state._kpiPending.used;
+  const total  = state._kpiServer.total  + state._kpiPending.total;
+  $('#uEarned').textContent = fmt(earned);
+  $('#uUsed').textContent   = fmt(used);
+  $('#uTotal').textContent  = fmt(total);
+}
+
+// ใช้เมื่อตัวเลขจาก RTDB เปลี่ยน → เคลียร์ pending ถ้าถูก Sync แล้ว
+function reconcileKPIFromServer(newEarned, newUsed, newTotal){
+  // ถ้าตัวเลขเซิร์ฟเวอร์ “ขยับขึ้น/ปรับแล้ว” ให้รีเซ็ต pending
+  const changed = (
+    newEarned !== state._kpiServer.earned ||
+    newUsed   !== state._kpiServer.used   ||
+    newTotal  !== state._kpiServer.total
+  );
+  state._kpiServer = { earned:newEarned, used:newUsed, total:newTotal };
+  if (changed) {
+    // เซิร์ฟเวอร์ยืนยันผลแล้ว → ล้าง pending ที่รอ
+    state._kpiPending = { earned:0, used:0, total:0 };
+  }
+  renderKPI();
+}
+
+// เพิ่ม/ลด pending แบบเป็นดeltas (+/-)
+function applyKPIDelta(deltaEarned=0, deltaUsed=0){
+  state._kpiPending.earned += deltaEarned;
+  state._kpiPending.used   += deltaUsed;
+  state._kpiPending.total   = state._kpiPending.earned - state._kpiPending.used;
+  renderKPI();
+}
+
 /* ========= Firebase ========= */
 async function ensureFirebase(){ if(fb) return fb; const db = getDatabase(app); fb={ app, db, ref, onValue, get, off, child }; return fb; }
 
@@ -507,51 +711,149 @@ const saveLatestCache = x => { try{ localStorage.setItem(latestStoreKey(), JSON.
 const readLatestCache = () => { try{ return JSON.parse(localStorage.getItem(latestStoreKey())||'null'); }catch{ return null } };
 const clearLatestCache = () => { try{ localStorage.removeItem(latestStoreKey()); }catch{} };
 
-/* ========= User fetch (fast) ========= */
-async function fetchUserQuick(sap){
-  const direct = [
+/* ========= Login / Logout (FAST + no-duplicate) ========= */
+async function fetchUserQuickFast(sap){
+  const DB = "https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const paths = [
     `public/usersSummary/${encodeURIComponent(sap)}`,
     `public/users/${encodeURIComponent(sap)}`,
     `public/UsersSummary/${encodeURIComponent(sap)}`
   ];
-  for(const p of direct){ try{ const r=await fetch(`${DB_URL}/${p}.json?t=${Date.now()}`,{cache:'no-store'}); if(r.ok){ const u=await r.json(); if(u&&typeof u==='object') return u; } }catch{} }
-  try{ const r2=await fetch(`${DB_URL}/public/usersSummary.json?t=${Date.now()}`,{cache:'no-store'}); if(r2.ok){ const all=await r2.json(); if(all && all[sap]) return all[sap]; } }catch{}
+  for (const p of paths){
+    try{
+      const r = await fetch(`${DB}/${p}.json?t=${Date.now()}`, { cache:'no-store' });
+      if (!r.ok) continue;
+      const u = await r.json();
+      // ต้องเป็น object และมี field ใด ๆ ที่บอกว่าเป็นผู้ใช้จริง
+      if (u && typeof u === 'object' && (
+          'name' in u || 'Name' in u || 'PointsTotal' in u || 'pointsTotal' in u || 'Status' in u || 'active' in u
+        )) {
+        return u;
+      }
+    }catch(_){}
+  }
   return null;
 }
 
-/* ========= Login / Logout ========= */
-$('#sap').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/[^\d]/g,'') });
-$('#btnLogin').onclick=async ()=>{
-  const s=$('#sap').value.trim(); 
-  if(!s){ $('#loginMsg').textContent='กรุณากรอก SAP'; return; }
-  $('#loginMsg').textContent='กำลังตรวจสอบ...';
-  let u=null; try{ u=await fetchUserQuick(s); }catch{}
-  if(!u){ $('#loginMsg').innerHTML='ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin'; return; }
-  // normalize สถานะให้เท่ากันกับฝั่ง Apps Script
-  function isActiveStatus(val){
-    const s = String(val ?? '').normalize('NFKC').trim().toLowerCase();
-    if(!s) return true; // ว่าง = ถือว่า active
-    if (/^(inactive|non-?active|disabled?|false|0|ปิด|งด|หยุด)$/i.test(s)) return false;
-    if (/^(active|true|1|เปิด|ใช้งาน|enabled?|on|yes)$/i.test(s)) return true;
-    // fallback: ถ้าไม่ได้ขึ้นต้นด้วย "non" ก็ถือว่า active
-    return !(s.startsWith('non'));
-  }
-  const raw = (u?.active ?? u?.Status ?? u?.status ?? u?.Active ?? 'Active');
-  const ok  = (typeof u?.active === 'boolean') ? u.active : isActiveStatus(raw);
+// ใช้ gasJSONP ที่มีอยู่ ถ้าไม่มีค่อยประกาศ
+if (typeof window.gasJSONP !== 'function') {
+  window.gasJSONP = function gasJSONP(params, timeoutMs=1800){
+    return new Promise((resolve)=>{
+      const cb='cb_'+Math.random().toString(36).slice(2);
+      let done=false, timer=setTimeout(()=>{ if(!done){ done=true; resolve(null); } }, timeoutMs);
+      window[cb]=d=>{ if(done) return; done=true; clearTimeout(timer); resolve(d); try{delete window[cb]; s.remove();}catch{} };
+      const qs=new URLSearchParams({ ...params, callback:cb }).toString();
+      const s=document.createElement('script');
+      s.src = `${SCRIPT_URL}?${qs}`;
+      s.onerror = ()=>{ if(done) return; done=true; clearTimeout(timer); resolve(null); };
+      document.body.appendChild(s);
+    });
+  };
+}
 
-  if(!ok){ $('#loginMsg').innerHTML='สถานะ <b>Non-active</b> • กรุณาติดต่อผู้ดูแลระบบ'; return; }
+// ถาม Apps Script เมื่อ RTDB ยังไม่มี
+async function checkUserStatusFast(sap){
+  const r = await gasJSONP({ act:'userstatus', sap }, 1800);
+  if (!r || r.ok !== true) return { found:false, active:false, name:'' };
+  const hasFoundKey = ('found' in r) || ('exists' in r);
+  const found  = hasFoundKey ? !!(r.found ?? r.exists) : (typeof r.active !== 'undefined');
+  const active = !!r.active;
+  const name   = r.name || '';
+  return { found, active, name };
+}
 
-  state.sap=s; state.name=((u && (u.name||u.Name)) || s); setWelcome(state.name);
-  saveSession({ sap:state.sap, name:state.name }); clearAutoPopupFlags();
+// กรองให้กรอกเลข
+document.querySelector('#sap').addEventListener('input', e=>{
+  e.target.value = e.target.value.replace(/[^\d]/g,'');
+});
+
+document.querySelector('#btnLogin').onclick = async () => {
+  const sapEl = document.querySelector('#sap');
+  const msgEl = document.querySelector('#loginMsg');
+  const btn   = document.querySelector('#btnLogin');
+
+  const sap = (sapEl.value || '').trim();
+  if (!sap){ msgEl.textContent = 'กรุณากรอก SAP'; return; }
+
+  btn.disabled = true;
+  clearLoginMsg(); // เคลียร์/ตั้งเป็นโทนปกติ
+document.querySelector('#loginMsg').textContent = 'กำลังตรวจสอบ...';
+
+  // 1) เช็ค RTDB ก่อน (เร็ว)
+  let u = null;
+  try { u = await fetchUserQuickFast(sap); } catch(_){ u = null; }
+
+  // 2) ถ้าไม่เจอ → ถาม GAS (มี timeout)
+  if (!u){
+  const st = await checkUserStatusFast(sap);
+
+  if (st.found && !st.active){
+  showLoginError('ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin');
+  btn.disabled = false;
+  return;
+}
+if (!st.found){
+  showLoginError('ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin');
+  btn.disabled = false;
+  return;
+}
+
+  // เข้าได้ชั่วคราวระหว่างรอ sync
+  u = { name: st.name || sap, PointsEarned:0, PointsUsed:0, PointsTotal:0, active:true };
+}
+
+  // 3) เคารพฟิลด์สถานะจาก RTDB ถ้ามี
+  const rawStatus = (u.active ?? u.Status ?? u.status ?? u.Active ?? '');
+  const ok = isActiveStatus(rawStatus);
+if (!ok && rawStatus !== ''){
+  showLoginError('สถานะ <b>non-active</b> • โปรดติดต่อ admin');
+  btn.disabled = false;
+  return;
+}
+
+  // 4) ผ่าน → เข้าแอปและต่อ realtime
+  msgEl.textContent = '';
+  window.state = window.state || {};
+  state.sap  = sap;
+  state.name = (u.name || u.Name || sap);
+  setWelcome(state.name);
+  localStorage.setItem('SAP', sap);
+  try{ localStorage.setItem('anes.session.v1', JSON.stringify({sap: state.sap, name: state.name})); }catch{}
 
   document.body.classList.remove('is-login');
-  $('#loginBox').style.display='none';
-  $('#btnLogout').style.display='inline-block';
-  attachRealtime();
-  autoOpenOnceIfAvailable(true);   
-  scheduleAutoPopup();             
+  document.querySelector('#loginBox').style.display = 'none';
+  document.querySelector('#btnLogout').style.display = 'inline-block';
+
+  ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='block'; });
+
+  setTimeout(()=>{ try{
+    attachRealtime();
+    autoOpenOnceIfAvailable(true);
+    scheduleAutoPopup();
+  }catch(e){ console.error(e); } }, 0);
 };
-$('#btnLogout').onclick=()=>{ clearAutoPopupFlags(); clearLatestCache(); clearSession(); location.reload(); };
+
+document.querySelector('#btnLogout').onclick = ()=>{
+  try{
+    localStorage.removeItem('SAP');
+    localStorage.removeItem('anes.session.v1');
+  }catch(_){}
+  location.reload();
+};
+
+function showLoginError(msg){
+  const el = document.querySelector('#loginMsg');
+  el.innerHTML = msg;
+  el.classList.remove('muted');
+  el.classList.add('bad');   // <- .bad เป็นสีแดงอยู่แล้ว
+}
+function clearLoginMsg(){
+  const el = document.querySelector('#loginMsg');
+  el.textContent = '';
+  el.classList.remove('bad');
+  el.classList.add('muted');
+}
 
 /* ========= QR lock (10m) ========= */
 const QRKEY=()=>`anes.qrlock.${state.sap||'0'}`; let lock=null, raf=null;
@@ -581,7 +883,6 @@ function unmarkClinPair(key){ try{ localStorage.removeItem(clinPairStoreKey(key)
 
 function renderWeekly(){
   const [wStart, wEnd]=thisWeekRange();
-
   const localArr=loadWeekly().map(x=>({
     dateText:String(x.dateISO||x.ts||''),
     actId:String(x.actId||''),
@@ -591,40 +892,39 @@ function renderWeekly(){
     _source:'local'
   }));
 
-  const remoteArr=(state.weeklyRemote||[]).map(x=>({
-    dateText:String(x.dateISO||x.ts||x.timestamp||''),
-    actId:String(x.actId||''),
-    title:String(x.title||''),
-    result:x.result,
-    points:x.points,
-    _source:'remote'
+    const remoteArr = (state.weeklyRemote || []).map(x => ({
+    // ✅ เพิ่ม x.dateText เป็นตัวเลือกแรก
+    dateText: String(x.dateText || x.dateISO || x.ts || x.timestamp || ''),
+    actId: String(x.actId || ''),
+    title: String(x.title || ''),
+    result: x.result,
+    points: x.points,
+    _source: 'remote'
   }));
 
   const pickByKey={};
   [...localArr,...remoteArr].forEach(x=>{
-    const t=parseLocal(x.dateText)||Date.parse(x.dateText);
-    const d=new Date(isNaN(t)?0:t);
-    if(!(d>=wStart && d<wEnd)) return;
-    const key = (d.toISOString().slice(0,10)) + '|' + x.actId;
-    const prev = pickByKey[key];
-    const item = {
-      _t:t, _d:d,
-      title: x.title || (getActMetaById(x.actId)||{}).Title || (getActMetaById(x.actId)||{}).Question || x.actId || '-',
-      result: x.result,
-      points: Number(x.points||0),
-      _source: x._source
-    };
-    if(!prev){ pickByKey[key]=item; return; }
-    const better =
-      (prev._source!=='remote' && item._source==='remote') ||
-      (item.points > prev.points);
-    if(better) pickByKey[key]=item;
-  });
+  const d = anyToDate(x.dateText);
+  if(!d) return;
+  if(!(d>=wStart && d<wEnd)) return;
+  const key = (d.toISOString().slice(0,10)) + '|' + x.actId;
+  const item = {
+    _d: d,
+    title: x.title || (getActMetaById(x.actId)||{}).Title || (getActMetaById(x.actId)||{}).Question || x.actId || '-',
+    result: x.result,
+    points: Number(x.points||0),
+    _source: x._source
+  };
+  const prev = pickByKey[key];
+  if(!prev){ pickByKey[key]=item; return; }
+  const better = (prev._source!=='remote' && item._source==='remote') || (item.points > prev.points);
+  if(better) pickByKey[key]=item;
+});
 
-  const merged = Object.values(pickByKey).sort((a,b)=>b._t-a._t);
+  const merged = Object.values(pickByKey).sort((a,b)=> b._d - a._d);
   const html = merged.length
     ? merged.map(r=>{
-        const th=r._d.toLocaleDateString('th-TH',{year:'numeric',month:'2-digit',day:'2-digit'});
+        const th = thaiDate(r._d);
         const result=r.result==null?'รอตรวจ':(r.result?'ถูก':'ผิด');
         const pts=(r.points==null)?'—':fmt(r.points);
         return `<tr><td>${th}</td><td>${escapeHtml(r.title)}</td><td>${result}</td><td>${pts}</td></tr>`;
@@ -638,17 +938,57 @@ function renderWeekly(){
 /* ========= Annual ========= */
 function renderAnnual(){
   const box=$('#annualBox'); const tb=$('#annual'); if(!box||!tb) return;
-  const raw=Array.isArray(state.annual)? state.annual : Object.values(state.annual||{});
-  const list=raw.slice().sort((a,b)=>{ const ta=new Date(a.timestamp||a.awardedAt||a.AwardedAt||0).getTime(); const tb=new Date(b.timestamp||b.awardedAt||b.AwardedAt||0).getTime(); return tb-ta; });
-  if(!list.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center">—</td></tr>'; box.style.display='block'; return; }
-  const rows=list.map(r=>{ const d=new Date(r.timestamp||r.awardedAt||r.AwardedAt||Date.now()); const dt=d.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}); const title=String(r.title||r.Title||`แบบสอบถามชุดที่ ${r.formNo||r.FormNo||''}`).trim(); const total=Number(r.totalPoints ?? (Number(r.basePoints||r.BasePoints||0)+Number(r.bonusPoints||r.BonusPoints||0)))||0; return `<tr><td>${dt}</td><td>${escapeHtml(title)}</td><td style="text-align:center">${total}</td></tr>`; }).join('');
-  tb.innerHTML=rows; box.style.display='block';
+
+  const raw = Array.isArray(state.annual) ? state.annual : Object.values(state.annual||{});
+
+  // sort โดยใช้ anyToDate
+  const list = raw.slice().sort((a,b)=>{
+    const da = anyToDate(a.timestamp ?? a.awardedAt ?? a.AwardedAt);
+    const db = anyToDate(b.timestamp ?? b.awardedAt ?? b.AwardedAt);
+    return (db?.getTime()||0) - (da?.getTime()||0);
+  });
+
+  if(!list.length){
+    tb.innerHTML='<tr><td colspan="3" style="text-align:center">—</td></tr>';
+    box.style.display='block';
+    return;
+  }
+
+  const rows = list.map(r=>{
+    const d  = anyToDate(r.timestamp ?? r.awardedAt ?? r.AwardedAt);
+    const dt = thaiDate(d);
+    const title = String(r.title||r.Title||`แบบสอบถามชุดที่ ${r.formNo||r.FormNo||''}`).trim();
+    const total = Number(r.totalPoints ?? (Number(r.basePoints||r.BasePoints||0)+Number(r.bonusPoints||r.BonusPoints||0)))||0;
+    return `<tr><td>${dt}</td><td>${escapeHtml(title)}</td><td style="text-align:center">${total}</td></tr>`;
+  }).join('');
+
+  tb.innerHTML = rows;
+  box.style.display='block';
 }
 
 function parseLocal(s){ if(!s) return NaN; let t=String(s).trim(); t=t.replace(/([+\-]\d{2}):?(\d{2})$/, (m,hh,mm)=>{ const ok=['00','30','45']; return `${hh}:${ok.includes(mm)?mm:'00'}`; }).replace(/([+\-])(\d)(?=:)/,(_,sign,d)=>`${sign}0${d}`); if(/^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/.test(t)){ const ts=new Date(t.replace(' ','T')).getTime(); if(!Number.isNaN(ts)) return ts; } const ts2=new Date(t).getTime(); if(!Number.isNaN(ts2)) return ts2; const m=t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/); if(m){ const y=Number(m[3])<100?2000+Number(m[3]):Number(m[3]); const mm=Number(m[2])-1; const dd=Number(m[1]); const hh=Number(m[4]||0); const mi=Number(m[5]||0); return new Date(y,mm,dd,hh,mi).getTime(); } return NaN; }
 function isIn(st,en){ const now=Date.now(); const a=parseLocal(st); const b=parseLocal(en); if(Number.isNaN(a)&&Number.isNaN(b)) return true; if(Number.isNaN(a)) return now<=b; if(Number.isNaN(b)) return now>=a; const start=Math.min(a,b); const end=Math.max(a,b); return now>=start && now<=end; }
 function isTodayLocal(str){ const t=parseLocal(str); if(Number.isNaN(t)) return false; const d=new Date(t), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
-function hasAns(id){ if(!id) return false; if(localStorage.getItem(aKey(id))) return true; const x=state.lastSubmission; if(!x) return false; const same=String(x.actId||'')===String(id||''); const ts=x.ts||x.timestamp; if(!ts) return false; const d=new Date(ts), n=new Date(); return same && d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate(); }
+function hasAns(id){
+  if(!id) return false;
+
+  // แบบเดิม
+  if(localStorage.getItem(aKey(id))) return true;
+
+  // ✅ ดูคีย์รูปแบบที่สองด้วย: ans:YYYY-MM-DD:SAP:ActID (ใช้โซนเวลาไทย)
+  const k2 = `ans:${todayKey('Asia/Bangkok')}:${state.sap||''}:${id}`;
+  if(localStorage.getItem(k2)) return true;
+
+  // เผื่อกรณีส่งไปแล้วในวันนี้ (optimistic)
+  const x = state.lastSubmission;
+  if(!x) return false;
+  const same = String(x.actId||'') === String(id||'');
+  const ts   = x.ts || x.timestamp;
+  if(!ts) return false;
+  const d = new Date(ts), n = new Date();
+  return same && d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
+}
+
 function titleClinType(t){ const s=String(t||'').toLowerCase(); if(/\bnon[-\s]?clinical\b/.test(s) || /(non[-\s]?clinical)/i.test(t)) return 'nonclin'; if(/\bclinic\b/.test(s) || /\bclinical\b/.test(s) || /(clinic)/i.test(t)) return 'clin'; return null; }
 function pairKeyOf(a){ const g=a.GroupId||a.groupId||''; const t=a.Title||a.Question||''; const tag=titleClinType(t); return (g && tag)?String(g):null; }
 
@@ -663,13 +1003,17 @@ async function attachRealtime(){
   await preloadAllActivities();
 
   onValue(ref(FB.db,'public/usersSummary/'+state.sap), s=>{
-  const v=s.val()||{};
+  const v = s.val() || {};
   state.total = Number(v.pointsTotal||v.PointsTotal||0);
+
   ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
     .forEach(id=>$('#'+id).style.display='block');
-  $('#uEarned').textContent=fmt(v.pointsEarned||v.PointsEarned||0);
-  $('#uUsed').textContent  =fmt(v.pointsUsed  ||v.PointsUsed  ||0);
-  $('#uTotal').textContent =fmt(v.pointsTotal ||v.PointsTotal ||0);
+
+  const earned = Number(v.pointsEarned||v.PointsEarned||0);
+  const used   = Number(v.pointsUsed  ||v.PointsUsed  ||0);
+  const total  = Number(v.pointsTotal ||v.PointsTotal || (earned - used) || 0);
+
+  reconcileKPIFromServer(earned, used, total);
 
   // โหลด lock ก่อน แล้วค่อยเรนเดอร์ เพื่อไม่ให้เฟรมแรก enable
   lock = loadLock();
@@ -704,35 +1048,65 @@ async function attachRealtime(){
 
 /* ========= Rewards render ========= */
 function renderRewards(){
-  const data=state.rewards||{};
-  const html=Object.entries(data).map(([name,v])=>{
-    const active=String((v.Active==null?true:v.Active)).toLowerCase()!=='false'; if(!active) return '';
-    const need=Number((v.pointsRequired==null?0:v.pointsRequired));
-    const stock=Number((v.stock==null?0:v.stock));
-    const lockNow = (lock ?? loadLock());
-    const can = (state.total >= need && stock > 0 && !lockNow && need > 0);
-    const raw = (v.imageUrl||v.ImageURL||v.Image||'');
-    const url = (()=>{
-        const u = fixImg(raw);
-        if(!u) return '';
-        const join = u.includes('?') ? '&' : '?';
-        // ใช้ UpdatedAt เป็น cache-buster
-        return u + join + 'v=' + encodeURIComponent(v.UpdatedAt || '');
-      })();
+  const data = state.rewards || {};
 
-    const idForThumb=extractId(url);
-    return `<div class="reward">
-      <img loading="lazy" decoding="async"
-           src="${url||'https://via.placeholder.com/56?text=%20'}"
-           data-thumb="${idForThumb ? driveThumb(idForThumb) : ''}"
-           onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; this.dataset.thumb=''; } else { this.src='https://via.placeholder.com/56?text=%20'; }"
-           alt="${escapeHtml(name)}">
-      <div style="flex:1"><b>${escapeHtml(name)}</b><div class="muted">${fmt(need)} แต้ม • คงเหลือ ${fmt(stock)}</div></div>
-      <button class="btnRedeem" ${can?'':'disabled'} data-name="${escapeHtml(name)}" data-need="${need}">แลก</button>
-    </div>`;
+  // แปลง/ดึงค่าแต้มที่ต้องใช้ให้เป็นตัวเลขเดียวกัน
+  const needOf = (v) =>
+    Number(v.pointsRequired ?? v.PointsRequired ?? v.points ?? 0) || 0;
+
+  // สร้างอาร์เรย์แล้วเรียง: แต้มต้องใช้มาก → น้อย (tie-break ตามชื่อ/สต็อก)
+  const list = Object.entries(data)
+    .map(([name, v]) => ({
+      name,
+      v,
+      need: needOf(v),
+      stock: Number(v.stock ?? v.Stock ?? 0) || 0
+    }))
+    .sort((a, b) => (b.need - a.need) || (b.stock - a.stock) || a.name.localeCompare(b.name, 'th'));
+
+  const html = list.map(({name, v, need, stock}) => {
+    // active guard (ยอมรับรูปแบบ true/false, “active/non-active”, 1/0, ไทย/อังกฤษ)
+    const isTrue = (x) => {
+      const s = String(x ?? '').trim().toLowerCase();
+      if (typeof x === 'boolean') return x;
+      if (!s) return false;
+      if (['false','0','no','off','inactive','non-active','ปิด','งด','หยุด'].includes(s)) return false;
+      if (['true','1','yes','on','active','เปิด','ใช้งาน'].includes(s)) return true;
+      return false;
+    };
+    const active = isTrue(v.Active ?? v.active);
+
+    const lockNow = (lock ?? loadLock());
+    const can = (state.total >= need && stock > 0 && !lockNow && need > 0 && active);
+
+    const raw = (v.imageUrl || v.ImageURL || v.Image || '');
+    const url = (() => {
+      const u = fixImg(raw);
+      if (!u) return '';
+      const join = u.includes('?') ? '&' : '?';
+      return u + join + 'v=' + encodeURIComponent(v.UpdatedAt || '');
+    })();
+
+    const idForThumb = extractId(url);
+    return `
+      <div class="reward">
+        <img loading="lazy" decoding="async"
+             src="${url || 'https://via.placeholder.com/56?text=%20'}"
+             data-thumb="${idForThumb ? driveThumb(idForThumb) : ''}"
+             onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; this.dataset.thumb=''; } else { this.src='https://via.placeholder.com/56?text=%20'; }"
+             alt="${escapeHtml(name)}">
+        <div style="flex:1">
+          <b>${escapeHtml(name)}</b>
+          <div class="muted">${Number(need).toLocaleString('th-TH')} แต้ม • คงเหลือ ${Number(stock).toLocaleString('th-TH')}</div>
+        </div>
+        <button class="btnRedeem" ${can ? '' : 'disabled'} data-name="${escapeHtml(name)}" data-need="${need}">แลก</button>
+      </div>`;
   }).join('') || '<div class="muted">— ไม่มีรายการ —</div>';
-  $('#rewards').innerHTML=html;
-  document.querySelectorAll('.btnRedeem').forEach(b=> b.onclick=()=>{ if(b.disabled) return; createQR(b.dataset.name, Number(b.dataset.need||0)); });
+
+  $('#rewards').innerHTML = html;
+  document.querySelectorAll('.btnRedeem').forEach(b=>{
+    b.onclick = () => { if(b.disabled) return; createQR(b.dataset.name, Number(b.dataset.need||0)); };
+  });
 }
 
 /* ========= Top 20 (dialog) ========= */
@@ -934,11 +1308,12 @@ function openAct(act){
   if (_submitting) return;
   _submitting = true;
   try {
-    // กันตอบซ้ำ (client)
+    // ✅ กันตอบซ้ำ (ฝั่ง client)
     const id = act.ActID || act.id || act.actId;
-    const t  = String(act.InputType || 'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
-    if (hasAns(id)) {
+    if (localStorage.getItem(aKey(id))) {
       $('#actStatus').textContent = 'คุณได้ตอบคำถามนี้แล้ววันนี้';
+      $('#actModal').style.display = 'none';   // ✅ ปิด modal ทันที
+      actOpen = false;
       return;
     }
 
@@ -972,6 +1347,9 @@ function openAct(act){
     const hasAnswer = String(act.Answer || '').trim() !== '';
     const instantOK = (!isNumeric && hasAnswer) ? clientIsCorrect(act, ans) : null;
     const instantPts = (instantOK === true) ? (Number(act.BasePoints||0) + Number(act.CorrectBonus||0)) : 0;
+    if (instantOK === true && instantPts > 0) {
+      applyKPIDelta(instantPts, 0);
+    }
     const optimistic = { actId: id, title: (act.Title || id), ts, correct: instantOK, points: (instantOK ? instantPts : 0), userAnswer: ans, Finalized: false };
     state.lastSubmission = optimistic;
     renderLatest(optimistic);
@@ -1025,6 +1403,10 @@ function openAct(act){
         userAnswer: ans,
         Finalized: (server.correct !== 'PENDING')
       };
+
+      const delta = Number(final.points || 0) - Number(instantPts || 0);
+      if (delta !== 0) applyKPIDelta(delta, 0);
+
       state.lastSubmission = final;
       renderLatest(final);
       addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: final.Finalized });
@@ -1044,6 +1426,9 @@ function openAct(act){
           points: (res.points == null ? 0 : Number(res.points)),
           userAnswer: ans, Finalized: true
         };
+        const delta2 = Number(final.points || 0) - Number(instantPts || 0);
+        if (delta2 !== 0) applyKPIDelta(delta2, 0);
+
         state.lastSubmission = final;
         renderLatest(final);
         addOrUpdateWeekly({ dateISO: ts, title: final.title, actId: id, result: final.correct, points: final.points, Finalized: true });
@@ -1084,7 +1469,7 @@ function renderLatest(x){
   };
 
   const ansText=ansKey ? mapAnswerText(act, ansKey) : '';
-  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">❌ ไม่ถูก</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
+  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">สู้สู้น๊าาาา</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
   const qText=(act.Question||act.Title||data.title||data.actId||'-')+'';
   const html=`<div><b>คำถามวันนี้:</b> ${escapeHtml(qText)}</div><div><b>คำตอบของคุณ:</b> ${escapeHtml(your)} • ${verdict}</div>`;
   box.innerHTML=html; box.style.display='block';
@@ -1096,11 +1481,27 @@ $('#btnActNow').onclick=()=>{ const pick=pickAct(); if(!pick){ $('#btnActNow').d
 function mapWeeklyRow(it){ const dateText=String(it.dateISO||it.ts||it.timestamp||it.Date||it.date||it.time||''); const actId=String(it.actId||it.ActID||it.ActivityId||it.activityId||it.setId||it.GroupId||it.FormId||''); let title=String(it.title||it.Title||it.ActivityTitle||it.FormTitle||it.name||it.question||''); if(!title && actId){ const meta=getActMetaById(actId); if(meta) title=meta.Title||meta.Question||''; } const r=(it.result ?? it.Result ?? it.correct ?? it.Correct); let result=null; if(r===true || String(r).toLowerCase()==='true' || String(r)==='1') result=true; if(r===false || String(r).toLowerCase()==='false' || String(r)==='0') result=false; const points=Number(it.points ?? it.Points ?? it.point ?? it.award ?? it.Award ?? it.pointsAwarded ?? it.Score ?? 0) || 0; return { dateText, actId, title, result, points }; }
 
 async function wireWeeklyRealtime(){
-  const FB=await ensureFirebase();
-  const paths=[ `public/weeklyByUser/${state.sap}`, `public/FormAwardsByUser/${state.sap}`, `public/formAwardsByUser/${state.sap}` ];
-  paths.forEach(p=>{ onValue(ref(FB.db,p), snap=>{ const obj=snap.val()||{}; const arr=Array.isArray(obj)? obj : Object.values(obj); if(!arr.length) return; state.weeklyRemote=arr.map(mapWeeklyRow); renderWeekly(); }); });
-  onValue(ref(FB.db,'public/FormAwards'), snap=>{ const obj=snap.val()||{}; const arr=Object.values(obj).filter(it=> String(it.sap||it.SAP||it.user||it.userId||'')===String(state.sap||'')); if(!arr.length) return; state.weeklyRemote=arr.map(mapWeeklyRow); renderWeekly(); });
+  const FB = await ensureFirebase();
+  const unsub = [];
+  const paths = [
+    `public/weeklyByUser/${state.sap}`,
+    `public/FormAwardsByUser/${state.sap}`,
+    `public/formAwardsByUser/${state.sap}` // รองรับชื่อเก่าด้วย
+  ];
+  paths.forEach(p => {
+    const r = ref(FB.db, p);
+    const stop = onValue(r, snap => {
+      const obj = snap.val() || {};
+      const arr = Array.isArray(obj) ? obj : Object.values(obj);
+      if (!arr.length) return;
+      state.weeklyRemote = arr.map(mapWeeklyRow);
+      renderWeekly();
+    });
+    unsub.push(() => off(r));
+  });
+  state.offWeekly = () => unsub.forEach(f => f && f());
 }
+
 
 /* ========= Annual realtime ========= */
 state.offAnnual && state.offAnnual();
@@ -1148,6 +1549,26 @@ function clientIsCorrect(meta, userAns){
   return false;
 }
 
+function pickDateFrom(o){
+  const raw = (o?.dateISO ?? o?.awardedAt ?? o?.timestamp ?? o?.ts ?? o?.date ?? '').toString();
+  if(!raw) return null;
+  // ทำให้เป็น ISO-friendly: ช่องว่าง -> T, และ +0700 -> +07:00
+  const s = raw.replace(' ', 'T').replace(/([+\-]\d{2})(\d{2})$/, '$1:$2');
+  let d = new Date(s);
+  if(!isNaN(d)) return d;
+
+  // สำรอง: รับรูปแบบ dd/mm/yyyy hh:mm
+  const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  if(m){
+    d = new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+function fmtThaiDate(d){
+  return d ? d.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+}
 </script>
+
 </body>
 </html>
