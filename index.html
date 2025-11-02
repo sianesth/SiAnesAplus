@@ -1024,12 +1024,49 @@ async function attachRealtime(){
   renderWeekly();
 });
 
-  onValue(ref(FB.db,'public/redemptions/'+state.sap), s=>{
-    const arr=s.val()||[];
-    $('#history').innerHTML = Array.isArray(arr)&&arr.length
-      ? arr.slice(-50).reverse().map(x=>`<tr><td>${escapeHtml((x.timestamp||'').replace('T',' ').slice(0,19))}</td><td>${escapeHtml(x.rewardName||'')}</td><td>${fmt(x.points||0)}</td><td>${escapeHtml(x.status||'')}</td></tr>`).join('')
-      : '<tr><td colspan="4" style="text-align:center">—</td></tr>';
-  });
+  // ✅ ฟังจาก path ใหม่ที่ GAS เขียนให้: redemptionsByUser/{sap}
+onValue(ref(FB.db, 'public/redemptionsByUser/' + state.sap), async s => {
+  const obj  = s.val() || {};
+  // obj มีโครงสร้าง { thKey: { ts, reward|rewardName, points, adminName } }
+  const list = Object.values(obj)
+    .map(x => ({
+      timestamp: x.timestamp || x.ts || x.updatedAt || '',
+      rewardName: x.rewardName || x.reward || '',
+      points: Number(x.points || x.PointsUsed || 0) || 0,
+      status: x.status || 'CONFIRMED'
+    }))
+    .sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0))
+    .slice(0,50);
+
+  if (list.length) {
+    $('#history').innerHTML = list.map(x => `
+      <tr>
+        <td>${escapeHtml(String(x.timestamp||'').replace('T',' ').slice(0,19))}</td>
+        <td>${escapeHtml(x.rewardName||'')}</td>
+        <td style="text-align:center">${fmt(x.points||0)}</td>
+        <td>${escapeHtml(x.status||'')}</td>
+      </tr>
+    `).join('');
+  } else {
+    // ยังไม่มีรายการ → ดึง single latest เผื่อโชว์ทันที
+    try{
+      const res = await fetch(`${DB_URL}/public/redemptionsLatest/${encodeURIComponent(state.sap)}.json?t=${Date.now()}`, { cache:'no-store' });
+      const v = await res.json();
+      if (v && typeof v === 'object') {
+        const row = `
+          <tr>
+            <td>${escapeHtml(String((v.timestamp||v.ts||'').replace('T',' ').slice(0,19)))}</td>
+            <td>${escapeHtml(v.rewardName || v.reward || '')}</td>
+            <td style="text-align:center">${fmt(Number(v.points||0))}</td>
+            <td>${escapeHtml(v.status || 'CONFIRMED')}</td>
+          </tr>`;
+        $('#history').innerHTML = row;
+        return;
+      }
+    }catch(_){}
+    $('#history').innerHTML = '<tr><td colspan="4" style="text-align:center">—</td></tr>';
+  }
+});
 
   onValue(ref(FB.db,'public/rewards'), s=>{ state.rewards=s.val()||{}; renderRewards(); if(lock) disableRedeem(true); });
   onValue(ref(FB.db,'public/leaderboard'), s=>{ state.leader=s.val()||[]; });
@@ -1469,7 +1506,7 @@ function renderLatest(x){
   };
 
   const ansText=ansKey ? mapAnswerText(act, ansKey) : '';
-  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">สู้สู้น๊าาาา</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
+  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">🎉สู้สู้น๊าาาา</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
   const qText=(act.Question||act.Title||data.title||data.actId||'-')+'';
   const html=`<div><b>คำถามวันนี้:</b> ${escapeHtml(qText)}</div><div><b>คำตอบของคุณ:</b> ${escapeHtml(your)} • ${verdict}</div>`;
   box.innerHTML=html; box.style.display='block';
