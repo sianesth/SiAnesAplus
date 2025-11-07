@@ -1221,8 +1221,8 @@ function pickAct(){
 }
 
 function autoOpenOnceIfAvailable(force=false){ if(!state.sap || actOpen) return; const pick=pickAct(); if(!pick){ scheduleAutoPopup(); return; } const id= pick.twoStep==='clinPair' ? ('GROUP:'+pairKeyOf(pick.list[0])) : (pick.ActID||pick.id||pick.actId); const key=`anes.autopopup.${todayKey()}.${id}`; if(!force && sessionStorage.getItem(key)) return; sessionStorage.setItem(key,'1'); if(pick.twoStep==='clinPair') openActSelector(pick); else openAct(pick); }
-function scheduleAutoPopup(){ clearTimeout(_autoTimer); if(!state.sap) return; const now=Date.now(); const upcoming=getTodayActs().filter(a=>{ const id=a.ActID||a.id||a.actId; if(!id) return false; if(hasAns(id)) return false; const pk=pairKeyOf(a); if(pk && localStorage.getItem(clinPairStoreKey(pk))) return false; const st=parseLocal(a.WindowStart); return !Number.isNaN(st) && st>now; }).sort((a,b)=> parseLocal(a.WindowStart)-parseLocal(b.WindowStart)); if(!upcoming.length) return; const when=Math.max(250, parseLocal(upcoming[0].WindowStart)-now+200); _autoTimer=setTimeout(()=> autoOpenOnceIfAvailable(), when); }
-window.addEventListener('focus', ()=> autoOpenOnceIfAvailable());
+function scheduleAutoPopup(){ clearTimeout(_autoTimer); if(!state.sap) return; const now=Date.now(); const upcoming=getTodayActs().filter(a=>{ const id=a.ActID||a.id||a.actId; if(!id) return false; if(hasAns(id)) return false; const pk=pairKeyOf(a); if(pk && localStorage.getItem(clinPairStoreKey(pk))) return false; const st=parseLocal(a.WindowStart); return !Number.isNaN(st) && st>now; }).sort((a,b)=> parseLocal(a.WindowStart)-parseLocal(b.WindowStart)); if(!upcoming.length) return; const when=Math.max(250, parseLocal(upcoming[0].WindowStart)-now+200); _autoTimer=setTimeout(()=> autoOpenOnceIfAvailable(true), when); }
+window.addEventListener('focus', ()=> autoOpenOnceIfAvailable(true));
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoOpenOnceIfAvailable(); });
 function getTodayActs(){ const l=Array.isArray(state.activities)? state.activities : Object.values(state.activities||{}); return l.filter(isTodayAct); }
 
@@ -1506,7 +1506,16 @@ function renderLatest(x){
   };
 
   const ansText=ansKey ? mapAnswerText(act, ansKey) : '';
-  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">🎉สู้สู้น๊าาาา</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
+  // 🔧 merge finalized result from weekly realtime (ถ้ามี)
+const wk = (state.weeklyRemote || []).find(w =>
+  String(w.actId) === String(data.actId) && w.result !== null
+);
+if (wk) {
+  data.correct = (wk.result === true || String(wk.result).toLowerCase() === 'true');
+  if (wk.points != null) data.points = Number(wk.points) || 0;
+}
+
+  let verdict=''; if(data.correct===true){ verdict=`<span class="ok">✅ ถูกต้อง</span>${(data.points!=null && data.points>0)?` • +${data.points} แต้ม`:''}`; } else if(data.correct===false){ const reveal=ansKey?` • เฉลย: <b>${escapeHtml(ansText)}</b>`:''; verdict=`<span class="bad">❌ ไม่ถูก</span>${reveal}`; } else { verdict=`<span class="muted">⌛ รอตรวจสอบ</span>`; }
   const qText=(act.Question||act.Title||data.title||data.actId||'-')+'';
   const html=`<div><b>คำถามวันนี้:</b> ${escapeHtml(qText)}</div><div><b>คำตอบของคุณ:</b> ${escapeHtml(your)} • ${verdict}</div>`;
   box.innerHTML=html; box.style.display='block';
@@ -1526,19 +1535,21 @@ async function wireWeeklyRealtime(){
     `public/formAwardsByUser/${state.sap}` // รองรับชื่อเก่าด้วย
   ];
   paths.forEach(p => {
-    const r = ref(FB.db, p);
-    const stop = onValue(r, snap => {
-      const obj = snap.val() || {};
-      const arr = Array.isArray(obj) ? obj : Object.values(obj);
-      if (!arr.length) return;
-      state.weeklyRemote = arr.map(mapWeeklyRow);
-      renderWeekly();
-    });
-    unsub.push(() => off(r));
+  const r = ref(FB.db, p);
+  const stop = onValue(r, snap => {
+    const obj = snap.val() || {};
+    const arr = Array.isArray(obj) ? obj : Object.values(obj);
+    if (!arr.length) return;
+
+    state.weeklyRemote = arr.map(mapWeeklyRow);
+    renderWeekly();
+    renderLatest(state.lastSubmission || readLatestCache()); // ✅ ใส่บรรทัดนี้ต่อท้าย
   });
+  unsub.push(() => off(r));
+});
+
   state.offWeekly = () => unsub.forEach(f => f && f());
 }
-
 
 /* ========= Annual realtime ========= */
 state.offAnnual && state.offAnnual();
