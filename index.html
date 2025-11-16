@@ -1187,14 +1187,24 @@ $('#btnTop20').onclick = async () => {
     const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
     const users = snap.val() || {};
 
-    const top = Object.values(users).map(u => {
-      const name  = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
-      const total = Number(
-        u.PointsTotal ?? u.pointsTotal ??
-        (Number(u.PointsEarned ?? u.pointsEarned ?? 0) - Number(u.PointsUsed ?? u.pointsUsed ?? 0))
-      ) || 0;
-      return { name, total };
-    }).sort((a,b) => b.total - a.total).slice(0,20);
+    // กรองเอาเฉพาะผู้ใช้ที่ Active เท่านั้น
+    const top = Object.values(users)
+      .filter(u => {
+        const rawStatus = u.Status ?? u.status ?? u.active ?? '';
+        return isActiveStatus(rawStatus || 'Active');   // ใช้ฟังก์ชันเดิมที่เราเขียนไว้
+      })
+      .map(u => {
+        const name  = String(u.name || u.Name || u.sap || u.SAP || '-').trim();
+        const total = Number(
+          u.PointsTotal ?? u.pointsTotal ??
+          (Number(u.PointsEarned ?? u.pointsEarned ?? 0) - Number(u.PointsUsed ?? u.pointsUsed ?? 0))
+        ) || 0;
+        return { name, total };
+      })
+      // ลบคนที่แต้ม = 0 ทิ้งเผื่อมี record แปลก ๆ
+      .filter(r => r.total > 0)
+      .sort((a,b) => b.total - a.total)
+      .slice(0, 20);
 
     const thead = `
       <thead>
