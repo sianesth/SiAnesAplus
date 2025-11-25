@@ -128,14 +128,21 @@ th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left }
 .latest b{ font-weight:800 }
 
 /* ========== Login page ========== */
-body.is-login{ overflow:hidden; }
+body.is-login{
+  overflow:hidden;  /* หน้า login ยังไม่มีสกรอลล์เหมือนเดิม */
+  background:
+    radial-gradient(circle at top, #eef2ff 0%, #f4f4ff 35%, #fdf2ff 70%, #ffffff 100%);
+}
+
+/* กล่อง login ขยับขึ้นมาใกล้หัว แต่ยังมีระยะหายใจนิด ๆ */
 #loginBox{
   display:flex;
-  justify-content:center;
-  align-items:center;                /* เดสก์ท็อป: จัดกลางจอ */
-  padding:16px 12px;
-  min-height: calc(100vh - var(--header-h));  /* สูงพอเต็มจอใต้ header */
+  justify-content:center;    /* อยู่กลางซ้าย-ขวา */
+  align-items:flex-start;    /* จากเดิม center → ขยับ card ขึ้นด้านบน */
+  padding:24px 12px 20px;    /* ระยะจากหัวลงมา + ด้านล่างแบบละมุน ๆ */
+  min-height:calc(100vh - var(--header-h));
 }
+
 /* พื้นหลังพาสเทลเฉพาะตอนอยู่หน้า login */
 body.is-login{
   background:
@@ -1351,9 +1358,54 @@ async function fetchWinnersTable(today, actId){
 }
 
 async function loadTop20Winners(today, actId){
-  const paths=[ actId?`public/winnersByDate/${today}/${encodeURIComponent(actId)}`:null, `public/winnersByDate/${today}` ].filter(Boolean);
-  for(const p of paths){ const data=await readJson(p); if(!data) continue; if(typeof data==='object'){ const arr=Object.values(data).flatMap(v=> Object.values(v||{})); if(arr.length){ arr.sort((a,b)=> new Date(a.ts||a.timestamp||0) - new Date(b.ts||b.timestamp||0)); const seen=new Set(); const out=[]; for(const it of arr){ const sap=it.sap||it.SAP; if(!sap || seen.has(sap)) continue; seen.add(sap); out.push({ sap:String(sap), ts: it.ts||it.timestamp||null }); if(out.length>=20) break; } return out; } }
+  const paths = [
+    actId ? `public/winnersByDate/${today}/${encodeURIComponent(actId)}` : null,
+    `public/winnersByDate/${today}`  // เผื่อกรณีต้องรวมหลาย act (เช่น clinic / non-clinic)
+  ].filter(Boolean);
+
+  for (const p of paths){
+    const data = await readJson(p);
+    if (!data || typeof data !== 'object') continue;
+
+    let winners = [];
+
+    if (actId) {
+      // โครงสร้างแบบ pack ต่อ act: {sap1:{sap,name,ts}, sap2:{...}}
+      winners = Object.values(data).filter(v => v && typeof v === 'object');
+    } else {
+      // รวมทุกกิจกรรมของวันนั้น: {actId:{sap:{...}}, actId2:{...}}
+      winners = Object.values(data)
+        .flatMap(group => Object.values(group || {}))
+        .filter(v => v && typeof v === 'object');
+    }
+
+    if (!winners.length) continue;
+
+    // เรียงจากเวลาตอบเร็ว → ช้า
+    winners.sort((a,b) => {
+      const ta = new Date(a.ts || a.tsISO || a.timestamp || 0).getTime();
+      const tb = new Date(b.ts || b.tsISO || b.timestamp || 0).getTime();
+      return ta - tb;
+    });
+
+    // เก็บคนไม่ซ้ำตาม SAP สูงสุด 20 คน
+    const seen   = new Set();
+    const result = [];
+
+    for (const it of winners){
+      const sap = String(it.sap || it.SAP || '').trim();
+      if (!sap || seen.has(sap)) continue;
+      seen.add(sap);
+      result.push({
+        sap,
+        ts: it.ts || it.tsISO || it.timestamp || null
+      });
+      if (result.length >= 20) break;
+    }
+
+    if (result.length) return result;
   }
+
   return [];
 }
 
@@ -1369,9 +1421,9 @@ $('#btnWinners').onclick = async () => {
     const pk = pairKeyOf(act);
 
     if (pk) {
-      // ✅ กรณี Protocol (Clinic / Non-clinic) → รวมเป็น Protocol เดียว
+      // ✅ Protocol (Clinic / Non-clinic) → รวมเป็น Protocol เดียว
       const baseTitle = normalizeProtocolTitle(rawTitle) || rawTitle;
-      actId = null;  // ใช้ winners รวมของวันนี้ (ไม่แยก clinic / non-clinic)
+      actId = null;  // อ่าน winners แบบรวมทั้งคู่
       titleSuffix = ` — ${baseTitle || 'Protocol'}`;
     } else {
       // กิจกรรมอื่น ๆ ใช้ actId ตามปกติ
@@ -1383,48 +1435,102 @@ $('#btnWinners').onclick = async () => {
 
   $('#dlgTopTitle').textContent = 'Top 20 (วันนี้)' + titleSuffix;
 
-  const table = await fetchWinnersTable(today, actId);
-  const rows  = Array.isArray(table.rows) ? table.rows : [];
-
-  // ดึงมาใช้แค่ "ลำดับ" กับ "ชื่อ" เท่านั้น
-  const simpleRows = rows.map((r, i) => {
-    if (Array.isArray(r)) {
-      const rank = r[0] ?? (i + 1);
-      const name = r[1] ?? '-';
-      return [rank, name];
-    } else if (r && typeof r === 'object') {
-      const name = r.name || r.Name || r.fullName || r.FullName || '-';
-      return [i + 1, name];
+  // ========= 1) พยายามใช้ winnersByDate (ถูกและเร็ว) ก่อน =========
+  try {
+    let winners = await loadTop20Winners(today, actId);
+    if (!winners.length && actId) {
+      // ถ้า act นี้ไม่มีข้อมูล → ลองแบบรวมทั้งวัน
+      winners = await loadTop20Winners(today, null);
     }
-    return [i + 1, String(r ?? '-')];
-  });
 
-  const thead = `
-    <thead>
-      <tr>
-        <th style="width:80px;text-align:center">ลำดับ</th>
-        <th>ชื่อ-นามสกุล</th>
-      </tr>
-    </thead>`;
+    if (winners.length) {
+      const FB   = await ensureFirebase();
+      const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
+      const users = snap.val() || {};
 
-  const tbody = simpleRows.length
-    ? `<tbody>${
-        simpleRows.map(row => `
+      // winners ถูก sort ตามเวลาแล้ว (เร็ว → ช้า)
+      const rows = winners.map((w, idx) => {
+        const sap  = String(w.sap || w.SAP || '').trim();
+        const u    = sap ? (users[sap] || {}) : {};
+        const name = String(
+          u.name || u.Name || u.fullName || u.FullName || sap || '-'
+        ).trim();
+        return [idx + 1, name];   // [ลำดับ, ชื่อ]
+      });
+
+      const thead = `
+        <thead>
           <tr>
-            <td style="text-align:center">${escapeHtml(String(row[0]))}</td>
-            <td>${escapeHtml(String(row[1]))}</td>
+            <th style="width:80px;text-align:center">ลำดับ</th>
+            <th>ชื่อ-นามสกุล</th>
           </tr>
-        `).join('')
-      }</tbody>`
-    : `<tbody><tr><td colspan="2" style="text-align:center">—</td></tr></tbody>`;
+        </thead>`;
 
-  $('#dlgTopBody').innerHTML =
-    `<table class="top20-table">
-       ${thead}
-       ${tbody}
-     </table>`;
+      const tbody = rows.length
+        ? `<tbody>${
+            rows.map(r => `
+              <tr>
+                <td style="text-align:center">${r[0]}</td>
+                <td>${escapeHtml(r[1] || '-')}</td>
+              </tr>
+            `).join('')
+          }</tbody>`
+        : `<tbody><tr><td colspan="2" style="text-align:center">—</td></tr></tbody>`;
 
-  $('#dlgTop').showModal();
+      $('#dlgTopBody').innerHTML =
+        `<table class="top20-table">${thead}${tbody}</table>`;
+      $('#dlgTop').showModal();
+      return;    // ได้ผลลัพธ์แล้ว ไม่ต้อง fallback
+    }
+  } catch (e) {
+    console.error('loadTop20Winners error', e);
+    // ถ้ามีปัญหาให้ไปใช้ fallback ด้านล่าง
+  }
+
+  // ========= 2) Fallback เดิม: fetchWinnersTable (เผื่อวันเก่า / โครงสร้างเก่า) =========
+  try {
+    const table = await fetchWinnersTable(today, actId);
+    const rows  = Array.isArray(table.rows) ? table.rows : [];
+
+    const simpleRows = rows.map((r, i) => {
+      if (Array.isArray(r)) {
+        const rank = r[0] ?? (i + 1);
+        const name = r[1] ?? '-';
+        return [rank, name];
+      } else if (r && typeof r === 'object') {
+        const name = r.name || r.Name || r.fullName || r.FullName || '-';
+        return [i + 1, name];
+      }
+      return [i + 1, String(r ?? '-')];
+    });
+
+    const thead = `
+      <thead>
+        <tr>
+          <th style="width:80px;text-align:center">ลำดับ</th>
+          <th>ชื่อ-นามสกุล</th>
+        </tr>
+      </thead>`;
+
+    const tbody = simpleRows.length
+      ? `<tbody>${
+          simpleRows.map(row => `
+            <tr>
+              <td style="text-align:center">${escapeHtml(String(row[0]))}</td>
+              <td>${escapeHtml(String(row[1]))}</td>
+            </tr>
+          `).join('')
+        }</tbody>`
+      : `<tbody><tr><td colspan="2" style="text-align:center">—</td></tr></tbody>`;
+
+    $('#dlgTopBody').innerHTML =
+      `<table class="top20-table">${thead}${tbody}</table>`;
+    $('#dlgTop').showModal();
+  } catch (e) {
+    console.error('fallback winners error', e);
+    $('#dlgTopBody').textContent = '—';
+    $('#dlgTop').showModal();
+  }
 };
 
 /* ========= Open activity UI ========= */
@@ -1450,158 +1556,116 @@ function openAct(act){
   }
   $('#actModal').style.display='flex';
 
- $('#btnActSubmit').onclick = async () => {
-  if (_submitting) return;
-  _submitting = true;
-  try {
-    const id = act.ActID || act.id || act.actId;
+   $('#btnActSubmit').onclick = async () => {
+    if (_submitting) return;
+    _submitting = true;
 
-    // ✅ กันตอบซ้ำ (ฝั่ง client)
-    if (localStorage.getItem(aKey(id))) {
-      $('#actStatus').textContent = 'คุณได้ตอบคำถามนี้แล้ววันนี้';
-      $('#actModal').style.display = 'none';
-      actOpen = false;
-      return;
-    }
+    let success = false;   // จะใช้เช็คว่ามีการบันทึกสำเร็จจริงไหม
 
-    // ===== 1) อ่านคำตอบจาก UI =====
-    let ans;
-    if (['NUM2','NUM','NUMBER','NUMERIC','TEXT'].includes(t)) {
-      ans = ($('#actText').value || '').trim();
+    try {
+      const id = act.ActID || act.id || act.actId;
 
-      // สำหรับโจทย์เลข 2 หลัก
-      if (['NUM2','NUM','NUMBER','NUMERIC'].includes(t) && !/^\d{2}$/.test(ans)) {
-        $('#actStatus').textContent = 'กรุณากรอกเลข 2 หลัก (00–99)';
-        try { $('#actText').focus(); } catch(_){}
+      // ✅ กันตอบซ้ำ (ฝั่ง client)
+      if (localStorage.getItem(aKey(id))) {
+        $('#actStatus').textContent = 'คุณได้ตอบคำถามนี้แล้ววันนี้';
+        $('#actModal').style.display = 'none';
+        actOpen = false;
         return;
       }
-    } else {
-      const chk = document.querySelector('input[name="actOpt"]:checked');
-      if (!chk) {
-        $('#actStatus').textContent = 'กรุณาเลือกคำตอบ';
-        return;
+
+      // ===== 1) อ่านคำตอบจาก UI =====
+      let ans;
+      if (['NUM2','NUM','NUMBER','NUMERIC','TEXT'].includes(t)) {
+        ans = ($('#actText').value || '').trim();
+
+        if (['NUM2','NUM','NUMBER','NUMERIC'].includes(t) && !/^\d{2}$/.test(ans)) {
+          $('#actStatus').textContent = 'กรุณากรอกเลข 2 หลัก (00–99)';
+          try { $('#actText').focus(); } catch(_){}
+          return;
+        }
+      } else {
+        const chk = document.querySelector('input[name="actOpt"]:checked');
+        if (!chk) {
+          $('#actStatus').textContent = 'กรุณาเลือกคำตอบ';
+          return;
+        }
+        ans = String(chk.value || '').trim().toUpperCase();
       }
-      ans = String(chk.value || '').trim().toUpperCase();
-    }
 
-    // ===== 2) ตีตร้าว่าตอบแล้ว (optimistic) =====
-    localStorage.setItem(aKey(id),'1');
-    const pk = pairKeyOf(act);
-    if (pk) localStorage.setItem(clinPairStoreKey(pk),'1');
-    localStorage.setItem('anes.act.lastAns.' + id + '.' + (state.sap || ''), ans);
+      // ===== 2) ตีตร้าว่าตอบแล้ว (optimistic) =====
+      localStorage.setItem(aKey(id),'1');
+      const pk = pairKeyOf(act);
+      if (pk) localStorage.setItem(clinPairStoreKey(pk),'1');
+      localStorage.setItem('anes.act.lastAns.' + id + '.' + (state.sap || ''), ans);
 
-    // payload ส่งไป queue
-    const key = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-    const ts  = new Date().toISOString();
-    const payload = {
-      sap: state.sap,
-      actId: id,
-      answer: ans,
-      timestamp: ts,
-      client: 'web-anesa+'
-    };
-
-    // ===== 3) เดาผล "ถูก/ผิด" เพื่อโชว์ในกล่องล่าสุด (แต่ไม่ยุ่ง KPI) =====
-    const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
-    const hasAnswer = String(act.Answer || '').trim() !== '';
-    const instantOK = (!isNumeric && hasAnswer && typeof clientIsCorrect === 'function')
-      ? clientIsCorrect(act, ans)
-      : null;
-
-    // ✅ สำหรับรายงานสัปดาห์ เดาว่าได้แค่ BasePoints ไว้ก่อน
-    const optimisticPts = (instantOK === true ? Number(act.BasePoints || 0) : 0);
-
-    // ❌ ไม่บวก KPI เดี๋ยวนี้แล้ว ให้รอ RTDB อย่างเดียว
-    const optimistic = {
-      actId: id,
-      title: (act.Title || id),
-      ts,
-      correct: instantOK,
-      points: optimisticPts,
-      userAnswer: ans,
-      Finalized: false
-    };
-
-    state.lastSubmission = optimistic;
-    renderLatest(optimistic);
-    addOrUpdateWeekly({
-      dateISO: ts,
-      title: optimistic.title,
-      actId: id,
-      result: optimistic.correct,
-      points: optimistic.points,
-      Finalized: false
-    });
-
-    $('#actModal').style.display = 'none';
-    actOpen = false;
-    toast('✅ ส่งคำตอบแล้ว', 1200);
-    $('#btnActNow').disabled = true;
-    checkActivity();
-
-    // ===== 4) PUT เข้า RTDB: answersQueue =====
-    try {
-      await fetch(DB_URL + '/public/answersQueue/' + encodeURIComponent(key) + '.json', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } catch (_) {}
-
-    // ===== 5) เรียก Apps Script: queue:process =====
-    let server = null;
-    try {
-      const r = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action:'queue:process', key, item: payload })
-      });
-      server = await r.json();
-    } catch (_) {}
-
-    // ⬅️ กรณี Non-active
-    if (server && server.error === 'USER_NON_ACTIVE') {
-      toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
-      unmarkAns(id);
-      const pk2 = pairKeyOf(act);
-      if (pk2) unmarkClinPair(pk2);
-      $('#btnActNow').disabled = false;
-      checkActivity();
-      return;
-    }
-
-    // ===== 6) ถ้า queue:process สำเร็จ → อัปเดตรายงาน/ผลตอบ จาก "ค่าจริง" =====
-    if (server && server.ok) {
-      const final = {
+      // payload ส่งไป queue
+      const key = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+      const ts  = new Date().toISOString();
+      const payload = {
+        sap: state.sap,
         actId: id,
-        title: optimistic.title,
-        ts: ts,
-        correct: (server.correct === 'TRUE'
-                    ? true
-                    : (server.correct === 'FALSE' ? false : null)),
-        points: Number(server.points || 0),
-        userAnswer: ans,
-        Finalized: (server.correct !== 'PENDING')
+        answer: ans,
+        timestamp: ts,
+        client: 'web-anesa+'
       };
 
-      // ❌ ไม่ต้องคำนวณ delta / ไม่ต้อง applyKPIDelta อีก
-      // KPI จะถูกดึงจาก usersSummary (RTDB) อย่างเดียว
+      // ===== 3) เดาผล "ถูก/ผิด" เพื่อโชว์ในกล่องล่าสุด (แต่ไม่ยุ่ง KPI) =====
+      const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
+      const hasAnswer = String(act.Answer || '').trim() !== '';
+      const instantOK = (!isNumeric && hasAnswer && typeof clientIsCorrect === 'function')
+        ? clientIsCorrect(act, ans)
+        : null;
 
-      state.lastSubmission = final;
-      renderLatest(final);
+      const optimisticPts = (instantOK === true ? Number(act.BasePoints || 0) : 0);
+
+      const optimistic = {
+        actId: id,
+        title: (act.Title || id),
+        ts,
+        correct: instantOK,
+        points: optimisticPts,
+        userAnswer: ans,
+        Finalized: false
+      };
+
+      state.lastSubmission = optimistic;
+      renderLatest(optimistic);
       addOrUpdateWeekly({
         dateISO: ts,
-        title: final.title,
+        title: optimistic.title,
         actId: id,
-        result: final.correct,
-        points: final.points,
-        Finalized: final.Finalized
+        result: optimistic.correct,
+        points: optimistic.points,
+        Finalized: false
       });
 
-    } else {
-      // ===== 7) fallback → ยิง submit ตรงไป Apps Script =====
-      const res = await postSubmissionToSheet(payload);
+      $('#actModal').style.display = 'none';
+      actOpen = false;
+      toast('✅ ส่งคำตอบแล้ว', 1200);
+      $('#btnActNow').disabled = true;
+      checkActivity();
 
-      if (res && res.error === 'USER_NON_ACTIVE') {
+      // ===== 4) PUT เข้า RTDB: answersQueue =====
+      try {
+        await fetch(DB_URL + '/public/answersQueue/' + encodeURIComponent(key) + '.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (_) {}
+
+      // ===== 5) เรียก Apps Script: queue:process =====
+      let server = null;
+      try {
+        const r = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action:'queue:process', key, item: payload })
+        });
+        server = await r.json();
+      } catch (_) {}
+
+      // กรณี Non-active → ยกเลิก และคืนสถานะ
+      if (server && server.error === 'USER_NON_ACTIVE') {
         toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
         unmarkAns(id);
         const pk2 = pairKeyOf(act);
@@ -1611,20 +1675,21 @@ function openAct(act){
         return;
       }
 
-      if (res && res.ok) {
+      // ===== 6) ถ้า queue:process สำเร็จ → อัปเดตด้วยค่าจริง =====
+      if (server && server.ok) {
+        success = true;
+
         const final = {
           actId: id,
           title: optimistic.title,
           ts: ts,
-          correct: (res.correct === 'TRUE'
+          correct: (server.correct === 'TRUE'
                       ? true
-                      : (res.correct === 'FALSE' ? false : null)),
-          points: (res.points == null ? 0 : Number(res.points)),
+                      : (server.correct === 'FALSE' ? false : null)),
+          points: Number(server.points || 0),
           userAnswer: ans,
-          Finalized: true
+          Finalized: (server.correct !== 'PENDING')
         };
-
-        // ❌ ตรงนี้ก็ไม่ต้อง applyKPIDelta เช่นกัน
 
         state.lastSubmission = final;
         renderLatest(final);
@@ -1634,18 +1699,89 @@ function openAct(act){
           actId: id,
           result: final.correct,
           points: final.points,
-          Finalized: true
+          Finalized: final.Finalized
         });
-      }
-    }
 
-  } catch (err) {
-    console.error(err);
-    $('#actStatus').textContent = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
-  } finally {
-    _submitting = false;
-  }
-};
+      } else {
+        // ===== 7) fallback → ยิง submit ตรงไป Apps Script =====
+        const res = await postSubmissionToSheet(payload);
+
+        if (res && res.error === 'USER_NON_ACTIVE') {
+          toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
+          unmarkAns(id);
+          const pk2 = pairKeyOf(act);
+          if (pk2) unmarkClinPair(pk2);
+          $('#btnActNow').disabled = false;
+          checkActivity();
+          return;
+        }
+
+        if (res && res.ok) {
+          success = true;
+
+          const final = {
+            actId: id,
+            title: optimistic.title,
+            ts: ts,
+            correct: (res.correct === 'TRUE'
+                        ? true
+                        : (res.correct === 'FALSE' ? false : null)),
+            points: (res.points == null ? 0 : Number(res.points)),
+            userAnswer: ans,
+            Finalized: true
+          };
+
+          state.lastSubmission = final;
+          renderLatest(final);
+          addOrUpdateWeekly({
+            dateISO: ts,
+            title: final.title,
+            actId: id,
+            result: final.correct,
+            points: final.points,
+            Finalized: true
+          });
+        }
+      }
+
+      // ===== 8) ถ้าทั้ง queue:process และ fallback ไม่สำเร็จเลย → rollback =====
+      if (!success) {
+        // เอา flag ตอบแล้วออก
+        unmarkAns(id);
+        const pk3 = pairKeyOf(act);
+        if (pk3) unmarkClinPair(pk3);
+
+        // ลบรายการ weekly ที่เพิ่งใส่แบบ optimistic
+        try {
+          const arr = loadWeekly().filter(r =>
+            !(String(r.actId||'') === String(id) &&
+              String(r.dateISO || r.ts || '') === ts)
+          );
+          saveWeekly(arr);
+          renderWeekly();
+        } catch(_) {}
+
+        // ล้าง latest cache และกล่อง “กิจกรรมวันนี้”
+        state.lastSubmission = null;
+        clearLatestCache();
+        const box = $('#actLatest');
+        if (box) {
+          box.innerHTML = '';
+          box.style.display = 'none';
+        }
+
+        $('#btnActNow').disabled = false;
+        checkActivity();
+        toast('❌ ส่งคำตอบไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง', 4000);
+      }
+
+    } catch (err) {
+      console.error(err);
+      $('#actStatus').textContent = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+    } finally {
+      _submitting = false;
+    }
+  };
 
   $('#btnActClose').onclick=()=>{ $('#actModal').style.display='none'; actOpen=false; };
 }
