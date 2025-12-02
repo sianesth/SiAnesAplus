@@ -1292,26 +1292,59 @@ function isLottoAct(act){
 
   return false;
 }
-// ล๊อตโต้แบบ "ตัวเลข 2 หลัก" เท่านั้น (ใช้กับปุ่ม "ถูกเลข 2 หลัก")
-// ล๊อตโต้แบบ "เลข 2 หลัก / number" เท่านั้น
+// ===== ล็อตโต้แบบ "เลข 2 หลัก" ใช้กับปุ่ม "ถูกเลข 2 หลัก" =====
+// เงื่อนไข:
+//   - ต้องเป็นกิจกรรมที่ชื่อ/หมวด/ID มีคำว่า LOTTO
+//     หรือ ActID เป็นรูปแบบ D1_2025-12-01, D2_2025-12-15 ฯลฯ
+//   - และไม่ใช่กิจกรรมแบบ MCQ / CHOICE
 function isNumericLottoAct(meta){
   const cat   = String(meta.Category  || meta.category  || '').toUpperCase();
   const group = String(meta.GroupId   || meta.groupId   || meta.group || '').toUpperCase();
-  const title = String(meta.Title     || meta.title     || meta.Question || meta.question || '').toUpperCase();
+  const idRaw =
+    meta.ActID      || meta.actId      ||
+    meta.ActivityId || meta.activityId ||
+    meta.setId      || meta.GroupId    || '';
+  const actId = String(idRaw).toUpperCase();
   const input = String(meta.InputType || meta.inputType || '').toUpperCase();
 
-  // มีคำว่า LOTTO หรือ เสี่ยงทาย
-  const baseText   = `${cat} ${group} ${title}`;
-  const lottoFlag  = /LOTTO/.test(baseText) || /เสี่ยงทาย/.test(baseText);
+  // มีคำว่า LOTTO ใน Category / Group / ID
+  const hasLottoWord =
+    /LOTTO/.test(cat)   ||
+    /LOTTO/.test(group) ||
+    /LOTTO/.test(actId);
 
-  // เป็นฝั่ง "number" (เช่น LOTTO NUMBER, LOTTO (number), เลข 2 หลัก, เลขท้าย ฯลฯ)
-  const numberFlag =
-    /(NUMBER|NUMERIC|NUM2|2\s*หลัก|TWO\s*DIGIT|2DIGIT|เลขท้าย)/.test(baseText);
+  // รูปแบบ ID ของล็อตโต้รายวัน (เช่น D1_2025-12-01, D2_2025-12-16)
+  const idLooksLikeDayLotto =
+    /^D\d+_20\d{2}-\d{2}-\d{2}$/.test(actId) ||
+    /^DAY\d+[_-]/.test(actId);
 
-  // ตัด MCQ / ตัวเลือกออก (ฝั่ง choice)
+  const lottoFlag = hasLottoWord || idLooksLikeDayLotto;
+
+  // ไม่เอา MCQ / CHOICE
   const mcqFlag = /(MCQ|CHOICE|ตัวเลือก)/.test(input);
 
-  return lottoFlag && numberFlag && !mcqFlag;
+  return lottoFlag && !mcqFlag;
+}
+
+// หา ActID ของกิจกรรม LOTTO (เลข 2 หลัก) สำหรับวันนั้น ๆ จาก activityIndex
+function lottoActIdsForDate(dayKey){
+  const actsAll = Object.values(state.activityIndex || {});
+  const ids = new Set();
+
+  actsAll.forEach(a => {
+    if (!a) return;
+    // ต้องเป็นกิจกรรม LOTTO แบบเลข 2 หลัก
+    if (!isNumericLottoAct(a)) return;
+
+    // groupDate(a) จะดึงวันที่จาก GroupId/ActID เช่น D1_2025-12-01 → 2025-12-01
+    const g = groupDate(a);
+    if (g !== dayKey) return;
+
+    const id = a.ActID || a.id || a.actId;
+    if (id) ids.add(String(id));
+  });
+
+  return Array.from(ids);
 }
 
 function currentActForWinners(){
@@ -1484,7 +1517,7 @@ $('#btnWinners').onclick = async () => {
   // ❌ ถ้าวันนี้ไม่มี choice เลย (มีแต่ lotto) → ไม่ต้องไปอ่าน winnersByDate
   if (!candidateActs.length) {
     $('#dlgTopTitle').textContent = 'Top 20 (วันนี้) — กิจกรรมแบบเลือกช้อย';
-    $('#dlgTopBody').textContent  = 'วันนี้ไม่มีกิจกรรมแบบเลือกช้อย จึงไม่มี Top 20 ให้แสดง';
+    $('#dlgTopBody').textContent  = 'วันนี้ไม่มีกิจกรรมแบบเลือกช้อย';
     $('#dlgTop').showModal();
     return;
   }
@@ -1717,68 +1750,107 @@ $('#btnLottoAll').onclick = async () => {
 async function loadLottoCorrectForDate(dayKey){
   const winnersMap = new Map();   // sap -> { sap, ts }
 
+  // flatten object ซ้อน ๆ ให้เหลือ array ของ winner
   const flatten = (data) => {
-    if (!data) return [];
-    if (Array.isArray(data)) {
-      return data.filter(v => v && typeof v === "object");
-    }
-    const lvl1 = Object.values(data || {});
-    const lvl2 = lvl1.flatMap(v => {
-      if (!v) return [];
-      if (Array.isArray(v)) return v;
-      if (typeof v === 'object') return Object.values(v);
-      return [];
-    });
-    return lvl2.filter(v => v && typeof v === 'object');
-  };
+    const out = [];
+    const walk = (v) => {
+      if (!v) return;
 
-  const pushWinners = (items) => {
-    items.forEach(v => {
-      // --- 1) หา meta ของกิจกรรมจาก actId ---
-      const actId = String(
-        v.actId      || v.ActID      ||
-        v.activityId || v.ActivityId ||
-        v.setId      || v.GroupId    || ''
-      ).trim();
-
-      const metaFromActs = actId ? getActMetaById(actId) : null;
-      const meta = metaFromActs || v;   // ถ้าไม่มี meta ใน Activities ใช้ข้อมูลใน row แทน
-
-      // ต้องเป็น LOTTO แบบ "number"
-      if (!isNumericLottoAct(meta)) return;
-
-      // --- 2) คนที่ถูกเท่านั้น (ถ้าไม่มี flag ให้ถือว่าถูก เพราะ winnersByDate คือคนถูก) ---
-      const sap = String(v.sap || v.SAP || '').trim();
-      if (!sap) return;
-
-      const flag = v.correct ?? v.Correct ?? v.isWinner ?? v.winner;
-      if (flag === false || String(flag).toLowerCase() === 'false') return;
-
-      const ts = v.ts || v.tsISO || v.timestamp || v.awardedAt || v.AwardedAt || null;
-
-      // --- 3) เก็บเวลาแรกสุดของแต่ละคน ---
-      if (!winnersMap.has(sap)) {
-        winnersMap.set(sap, { sap, ts });
-      } else if (ts) {
-        const prev = winnersMap.get(sap);
-        const t1 = new Date(prev.ts || 0).getTime();
-        const t2 = new Date(ts).getTime();
-        if (t2 && (t1 === 0 || t2 < t1)) {
-          winnersMap.set(sap, { sap, ts });
+      if (Array.isArray(v)) {
+        v.forEach(walk);
+      } else if (typeof v === 'object') {
+        // ถ้ามี sap / SAP แสดงว่าเป็น leaf แล้ว
+        if ('sap' in v || 'SAP' in v) {
+          out.push(v);
+          return;
         }
+        Object.values(v).forEach(walk);
       }
-    });
+    };
+    walk(data);
+    return out;
   };
 
-  // 1) winnersByDate/<dayKey> (ทั้งวัน)
-  const dataByDate = await readJson(`public/winnersByDate/${dayKey}`);
-  pushWinners(flatten(dataByDate));
+  // helper เช็คว่า record นี้เป็น "ล็อตโต้เลข 2 หลัก" ไหม
+  const isLottoRecord = (rec) => {
+    const actId = String(
+      rec.actId || rec.ActID || rec.activityId || rec.ActivityId || ''
+    ).trim();
 
-  // 2) lottoWinnersByDate/<dayKey> (ถ้ามีเก็บแยก)
-  if (!winnersMap.size) {
-    const data = await readJson(`public/lottoWinnersByDate/${dayKey}`);
-    pushWinners(flatten(data));
+    const meta   = actId ? (getActMetaById(actId) || {}) : {};
+    const cat    = String(meta.Category || rec.Category || rec.category || '').toUpperCase();
+    const title  = String(
+      meta.Title || meta.Question ||
+      rec.title  || rec.Title    || ''
+    ).toUpperCase();
+    const input  = String(meta.InputType || rec.InputType || rec.inputType || '').toUpperCase();
+
+    const hasWordLotto =
+      /LOTTO/.test(cat) || /LOTTO/.test(title) || /เสี่ยงทาย/.test(title);
+
+    const isNumeric =
+      ['NUM2','NUM','NUMBER','NUMERIC'].includes(input);
+
+    // ถือว่าเป็นล็อตโต้เลข 2 หลัก ถ้ามีคำ LOTTO/เสี่ยงทาย หรือเป็นกิจกรรมกรอกเลข 2 หลัก
+    return hasWordLotto || isNumeric;
+  };
+
+  // ========== 1) ลองอ่านจาก winnersByDate/<dayKey> ก่อน ==========
+  const data = await readJson(`public/winnersByDate/${dayKey}`);
+  const items = flatten(data);
+
+  items.forEach(v => {
+    const sap = String(v.sap || v.SAP || '').trim();
+    if (!sap) return;
+
+    if (!isLottoRecord(v)) return;
+
+    const flag = v.correct ?? v.Correct ?? v.isWinner ?? v.winner;
+    if (flag === false || String(flag).toLowerCase() === 'false') return;
+
+    const ts = v.ts || v.tsISO || v.timestamp || v.awardedAt || v.AwardedAt || null;
+
+    if (!winnersMap.has(sap)) {
+      winnersMap.set(sap, { sap, ts });
+    } else if (ts) {
+      const prev = winnersMap.get(sap);
+      const t1 = new Date(prev.ts || 0).getTime();
+      const t2 = new Date(ts).getTime();
+      if (t2 && (t1 === 0 || t2 < t1)) {
+        winnersMap.set(sap, { sap, ts });
+      }
+    }
+  });
+
+  // ถ้าเจอจาก winnersByDate แล้วก็จบเลย
+  if (winnersMap.size) {
+    return Array.from(winnersMap.values());
   }
+
+  // ========== 2) Fallback: lottoWinnersByDate/<dayKey> (ถ้ามี) ==========
+  const dataLotto  = await readJson(`public/lottoWinnersByDate/${dayKey}`);
+  const itemsLotto = flatten(dataLotto);
+
+  itemsLotto.forEach(v => {
+    const sap = String(v.sap || v.SAP || '').trim();
+    if (!sap) return;
+
+    const flag = v.correct ?? v.Correct ?? v.isWinner ?? v.winner;
+    if (flag === false || String(flag).toLowerCase() === 'false') return;
+
+    const ts = v.ts || v.tsISO || v.timestamp || v.awardedAt || v.AwardedAt || null;
+
+    if (!winnersMap.has(sap)) {
+      winnersMap.set(sap, { sap, ts });
+    } else if (ts) {
+      const prev = winnersMap.get(sap);
+      const t1 = new Date(prev.ts || 0).getTime();
+      const t2 = new Date(ts).getTime();
+      if (t2 && (t1 === 0 || t2 < t1)) {
+        winnersMap.set(sap, { sap, ts });
+      }
+    }
+  });
 
   return Array.from(winnersMap.values());
 }
@@ -2188,7 +2260,13 @@ function renderLatest(seed){
       '—'
     ) + '';
 
-    const ansKey  = String(act.Answer || '').trim();
+    // พยายามดึงเฉลยจากหลายแหล่ง เผื่อบางที Answer ใน actIndex ยังไม่อัปเดต
+    let ansKey = String(
+      act.Answer          || act.answer          ||
+      item.correctAnswer  || item.winningNumber  ||
+      item.Answer         || ''
+    ).trim();
+
     const ansText = ansKey ? mapAnswerText(act, ansKey) : '';
 
     const corr = (item.correct != null ? item.correct : item.result);
