@@ -1292,6 +1292,27 @@ function isLottoAct(act){
 
   return false;
 }
+// ล๊อตโต้แบบ "ตัวเลข 2 หลัก" เท่านั้น (ใช้กับปุ่ม "ถูกเลข 2 หลัก")
+// ล๊อตโต้แบบ "เลข 2 หลัก / number" เท่านั้น
+function isNumericLottoAct(meta){
+  const cat   = String(meta.Category  || meta.category  || '').toUpperCase();
+  const group = String(meta.GroupId   || meta.groupId   || meta.group || '').toUpperCase();
+  const title = String(meta.Title     || meta.title     || meta.Question || meta.question || '').toUpperCase();
+  const input = String(meta.InputType || meta.inputType || '').toUpperCase();
+
+  // มีคำว่า LOTTO หรือ เสี่ยงทาย
+  const baseText   = `${cat} ${group} ${title}`;
+  const lottoFlag  = /LOTTO/.test(baseText) || /เสี่ยงทาย/.test(baseText);
+
+  // เป็นฝั่ง "number" (เช่น LOTTO NUMBER, LOTTO (number), เลข 2 หลัก, เลขท้าย ฯลฯ)
+  const numberFlag =
+    /(NUMBER|NUMERIC|NUM2|2\s*หลัก|TWO\s*DIGIT|2DIGIT|เลขท้าย)/.test(baseText);
+
+  // ตัด MCQ / ตัวเลือกออก (ฝั่ง choice)
+  const mcqFlag = /(MCQ|CHOICE|ตัวเลือก)/.test(input);
+
+  return lottoFlag && numberFlag && !mcqFlag;
+}
 
 function currentActForWinners(){
   // กิจกรรมวันนี้ทั้งหมด เรียงตามเวลาเริ่ม
@@ -1598,29 +1619,60 @@ $('#btnWinners').onclick = async () => {
     $('#dlgTop').showModal();
   }
 };
-// ปุ่ม "ถูกเลข 2 หลัก" — ใช้หลักการเหมือน Top20 ถูกและเร็ว (วันนี้)
-// แต่ "ไม่จำกัดจำนวน" และเอาเฉพาะกิจกรรมประเภทเลข 2 หลัก (lotto) เท่านั้น
-$('#btnLottoAll').onclick = async () => {
-  const today = todayKey();          // YYYY-MM-DD
 
-  $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)';
+// ปุ่ม "ถูกเลข 2 หลัก"
+// - วันหวยออก: ถ้ายังไม่เฉลย → "รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา"
+// - วันถัดไป: แสดงรายชื่อผู้ถูกของ "งวดเมื่อวาน"
+// - เลยมาเกิน 1 วัน และยังไม่มีงวดใหม่ → "รอรอบหวยออกครั้งถัดไปก่อนนะคะ"
+$('#btnLottoAll').onclick = async () => {
+  const tz        = 'Asia/Bangkok';
+  const today     = todayKey(tz);               // YYYY-MM-DD
+  const now       = new Date();
+  const yesterday = dayKeyFromDate(
+    new Date(now.getTime() - 24*60*60*1000),
+    tz
+  );
+
+  const hasLottoToday = getTodayActs().some(isLottoAct);
 
   try {
-    const winners = await loadLottoCorrectToday(today);
+    let usedDate = today;
+    let winners  = await loadLottoCorrectForDate(today);
 
-    if (!winners.length) {
-      $('#dlgTopBody').textContent = 'รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา';
+    // กรณีวันนี้มี lotto แต่ยังไม่มีผลเฉลย → ยังรออยู่
+    if (!winners.length && hasLottoToday) {
+      $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)';
+      $('#dlgTopBody').textContent  = 'รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา';
       $('#dlgTop').showModal();
       return;
     }
 
-    // ดึงชื่อจาก public/usersSummary (เหมือนปุ่ม Top 20)
+    // ไม่มี lotto วันนี้ → ลองดูงวดเมื่อวาน (ใช้โชว์ต่ออีก 1 วัน)
+    if (!winners.length) {
+      winners  = await loadLottoCorrectForDate(yesterday);
+      usedDate = yesterday;
+    }
+
+    // ถ้ายังไม่มีอีก → ถือว่าเลยงวดล่าสุดแล้ว
+    if (!winners.length) {
+      $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก';
+      $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
+      $('#dlgTop').showModal();
+      return;
+    }
+
+    // มีรายชื่อแล้ว
+    $('#dlgTopTitle').textContent =
+      (usedDate === today)
+        ? 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)'
+        : 'ผู้ที่ตอบถูกเลข 2 หลัก (งวดล่าสุด)';
+
+    // ดึงชื่อจาก public/usersSummary
     const FB   = await ensureFirebase();
     const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
     const users = snap.val() || {};
 
     const rows = winners
-      // คนที่ตอบก่อน ให้ลำดับน้อยกว่า (อยู่บน)
       .sort((a,b) => new Date(a.ts || 0) - new Date(b.ts || 0))
       .map((w, idx) => {
         const sap  = String(w.sap || w.SAP || '').trim();
@@ -1655,23 +1707,20 @@ $('#btnLottoAll').onclick = async () => {
     $('#dlgTop').showModal();
   } catch (e) {
     console.error('load lotto winners error', e);
-    $('#dlgTopBody').textContent = 'รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา';
+    $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก';
+    $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
     $('#dlgTop').showModal();
   }
 };
 
-// ===== ดึงรายชื่อผู้ที่ตอบถูก "เลข 2 หลัก" ของวันนี้ (ไม่จำกัดจำนวน) =====
-async function loadLottoCorrectToday(today) {
-  // วันนี้จะมี lotto แค่ 1 กิจกรรม (ที่คุณบอก)
-  const lottoActs = getTodayActs().filter(isLottoAct);
-  if (!lottoActs.length) return [];
-
+// ===== ดึงรายชื่อผู้ที่ตอบถูก "เลข 2 หลัก" ตามวัน (ไม่จำกัดจำนวน) =====
+async function loadLottoCorrectForDate(dayKey){
   const winnersMap = new Map();   // sap -> { sap, ts }
 
   const flatten = (data) => {
     if (!data) return [];
     if (Array.isArray(data)) {
-      return data.filter(v => v && typeof v === 'object');
+      return data.filter(v => v && typeof v === "object");
     }
     const lvl1 = Object.values(data || {});
     const lvl2 = lvl1.flatMap(v => {
@@ -1685,17 +1734,29 @@ async function loadLottoCorrectToday(today) {
 
   const pushWinners = (items) => {
     items.forEach(v => {
+      // --- 1) หา meta ของกิจกรรมจาก actId ---
+      const actId = String(
+        v.actId      || v.ActID      ||
+        v.activityId || v.ActivityId ||
+        v.setId      || v.GroupId    || ''
+      ).trim();
+
+      const metaFromActs = actId ? getActMetaById(actId) : null;
+      const meta = metaFromActs || v;   // ถ้าไม่มี meta ใน Activities ใช้ข้อมูลใน row แทน
+
+      // ต้องเป็น LOTTO แบบ "number"
+      if (!isNumericLottoAct(meta)) return;
+
+      // --- 2) คนที่ถูกเท่านั้น (ถ้าไม่มี flag ให้ถือว่าถูก เพราะ winnersByDate คือคนถูก) ---
       const sap = String(v.sap || v.SAP || '').trim();
       if (!sap) return;
 
-      // ฝั่ง server ควรเขียนเฉพาะคนที่ "ถูก" ลง winnersByDate อยู่แล้ว
-      // เผื่อมี flag ถูก/ไม่ถูก → ถ้าเขียนมาให้ก็เคารพด้วย
       const flag = v.correct ?? v.Correct ?? v.isWinner ?? v.winner;
       if (flag === false || String(flag).toLowerCase() === 'false') return;
 
       const ts = v.ts || v.tsISO || v.timestamp || v.awardedAt || v.AwardedAt || null;
 
-      // เก็บอย่างมาก 1 record ต่อ SAP (ถ้ามีหลาย record ให้เก็บเวลาตอบแรกสุด)
+      // --- 3) เก็บเวลาแรกสุดของแต่ละคน ---
       if (!winnersMap.has(sap)) {
         winnersMap.set(sap, { sap, ts });
       } else if (ts) {
@@ -1709,24 +1770,16 @@ async function loadLottoCorrectToday(today) {
     });
   };
 
-  // 1) ใช้ path หลัก — winnersByDate/<today>/<actId ของ lotto>
-  for (const act of lottoActs) {
-    const actId = act.ActID || act.id || act.actId;
-    if (!actId) continue;
+  // 1) winnersByDate/<dayKey> (ทั้งวัน)
+  const dataByDate = await readJson(`public/winnersByDate/${dayKey}`);
+  pushWinners(flatten(dataByDate));
 
-    const data = await readJson(
-      `public/winnersByDate/${today}/${encodeURIComponent(actId)}`
-    );
-    pushWinners(flatten(data));
-  }
-
-  // 2) เผื่อคุณเก็บ lotto แยกไว้ที่ lottoWinnersByDate/<today>
+  // 2) lottoWinnersByDate/<dayKey> (ถ้ามีเก็บแยก)
   if (!winnersMap.size) {
-    const data = await readJson(`public/lottoWinnersByDate/${today}`);
+    const data = await readJson(`public/lottoWinnersByDate/${dayKey}`);
     pushWinners(flatten(data));
   }
 
-  // คืนรายการทั้งหมด (ไม่ตัดเหลือ 20)
   return Array.from(winnersMap.values());
 }
 
@@ -2013,8 +2066,13 @@ function renderLatest(seed){
   const box = $('#actLatest');
   if (!box) return;
 
-  const sap   = state.sap || localStorage.getItem('SAP') || '';
-  const today = todayKey('Asia/Bangkok');
+  const sap = state.sap || localStorage.getItem('SAP') || '';
+  const tz  = 'Asia/Bangkok';
+  const today     = todayKey(tz);
+  const yesterday = dayKeyFromDate(
+    new Date(Date.now() - 24*60*60*1000),
+    tz
+  );
 
   // ---- รวมข้อมูลจาก weekly (local) + weeklyRemote (RTDB) ----
   const mergedByAct = {};
@@ -2031,7 +2089,8 @@ function renderLatest(seed){
 
     const d = anyToDate(dateText);
     if (!d) return;
-    if (dayKeyFromDate(d, 'Asia/Bangkok') !== today) return;
+
+    const dayKey = dayKeyFromDate(d, tz);
 
     const actId =
       r.actId        || r.ActID        ||
@@ -2040,6 +2099,28 @@ function renderLatest(seed){
       r.FormId       || '';
 
     if (!actId) return;
+
+    // เช็คว่า row นี้เป็นกิจกรรมล๊อตโต้หรือไม่
+    const meta  = getActMetaById(String(actId)) || {};
+    const cat   = String(meta.Category || r.Category || '').toUpperCase();
+    const title = String(
+      meta.Title || meta.Question ||
+      r.title || r.Title || ''
+    ).toUpperCase();
+    const input = String(meta.InputType || r.InputType || '').toUpperCase();
+
+    const isLottoRow =
+      /LOTTO/.test(cat) ||
+      /เสี่ยงทาย/.test(title) ||
+      ['NUM2','NUM','NUMBER','NUMERIC'].includes(input);
+
+    const isToday        = (dayKey === today);
+    const isYesterdayLot = (dayKey === yesterday && isLottoRow);
+
+    // ✅ แสดงเฉพาะ
+    //   - ทุกกิจกรรมของ "วันนี้"
+    //   - กิจกรรม "ล๊อตโต้ของเมื่อวาน"
+    if (!isToday && !isYesterdayLot) return;
 
     const key  = String(actId);
     const prev = mergedByAct[key] || {};
@@ -2058,7 +2139,8 @@ function renderLatest(seed){
       ts: d.toISOString(),
       title: r.title || r.Title || r.ActivityTitle || r.FormTitle || r.name || prev.title,
       result,
-      points: (pointsRaw != null ? Number(pointsRaw) || 0 : prev.points)
+      points: (pointsRaw != null ? Number(pointsRaw) || 0 : prev.points),
+      userAnswer: r.userAnswer ?? prev.userAnswer ?? null
     };
   }
 
@@ -2070,10 +2152,10 @@ function renderLatest(seed){
   // จาก weeklyRemote (RTDB)
   (state.weeklyRemote || []).forEach(addFromRow);
 
-  // seed (ล่าสุดจากการตอบในหน้านี้) ถ้าเป็นของวันนี้ให้ merge เพิ่มด้วย
+  // seed (ล่าสุดจากการตอบในหน้านี้) ถ้าเป็นของ "วันนี้" ให้ merge เพิ่มด้วย
   if (seed && seed.actId) {
     const d = anyToDate(seed.ts || seed.timestamp);
-    if (!d || dayKeyFromDate(d, 'Asia/Bangkok') === today) {
+    if (!d || dayKeyFromDate(d, tz) === today) {
       const key  = String(seed.actId);
       const prev = mergedByAct[key] || {};
       mergedByAct[key] = {
@@ -2113,11 +2195,17 @@ function renderLatest(seed){
     const pts  = (item.points == null ? null : Number(item.points) || 0);
 
     let verdict = '';
-    if (corr === true){
+    if (corr === true) {
       verdict = `<span class="ok">✅ ถูกต้อง</span>${(pts!=null && pts>0)?` • +${pts} แต้ม`:''}`;
-    } else if (corr === false){
-      const reveal = ansKey ? ` • เฉลย: <b>${escapeHtml(ansText)}</b>` : '';
-      verdict = `<span class="bad">❌ ไม่ถูก</span>${reveal}`;
+    } else if (corr === false) {
+      if (ansKey) {
+        const isLotto = isLottoAct(act);                // ดูว่าเป็นกิจกรรมล๊อตโต้ไหม
+        const label   = isLotto ? 'เลขท้าย 2 ตัวที่ออก' : 'เฉลย';
+        verdict =
+          `<span class="bad">❌ ไม่ถูก</span> • ${label}: <b>${escapeHtml(ansText)}</b>`;
+      } else {
+        verdict = `<span class="bad">❌ ไม่ถูก</span>`;
+      }
     } else {
       verdict = `<span class="muted">⌛ รอตรวจสอบ</span>`;
     }
