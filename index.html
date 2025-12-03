@@ -692,7 +692,6 @@ function thaiFromKeys(obj, keys){
   return '—';
 }
 
-
 // Google Drive image helpers
 function extractId(u){ const s=String(u||""); if(!s) return ""; const m = s.match(/\/d\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/); return m&&m[1]?m[1]:""; }
 function fixImg(u){ const s=String(u||'').trim(); if(!s) return ''; if(/uc\?export=view&id=/.test(s)) return s; const id=extractId(s); return id ? `https://drive.google.com/uc?export=view&id=${id}` : s; }
@@ -1958,6 +1957,7 @@ function openAct(act){
         actId: id,
         result: optimistic.correct,
         points: optimistic.points,
+        userAnswer: ans,
         Finalized: false
       });
 
@@ -2021,6 +2021,7 @@ function openAct(act){
           actId: id,
           result: final.correct,
           points: final.points,
+          userAnswer: ans,
           Finalized: final.Finalized
         });
 
@@ -2061,6 +2062,7 @@ function openAct(act){
             actId: id,
             result: final.correct,
             points: final.points,
+            userAnswer: ans,
             Finalized: true
           });
         }
@@ -2301,6 +2303,38 @@ function renderLatest(seed){
   box.style.display = 'block';
 }
 
+// แสดงผลหลัง server ส่ง correct (TRUE/FALSE/PENDING) กลับมา
+function showAnswerResult(isCorrect, points){
+  const last = state.lastSubmission || readLatestCache();
+  if (!last) return;
+
+  const final = {
+    ...last,
+    correct: (isCorrect === true ? true :
+              isCorrect === false ? false : null),
+    points: (points != null ? Number(points) || 0 : last.points),
+    Finalized: (isCorrect !== null),
+    ts: last.ts || last.timestamp || new Date().toISOString()
+  };
+
+  state.lastSubmission = final;
+  saveLatestCache(final);
+
+  // อัปเดตรายงานสัปดาห์ให้ตรงกับผลจริง
+  addOrUpdateWeekly({
+    dateISO: final.ts,
+    title: final.title,
+    actId: final.actId,
+    result: final.correct,
+    points: final.points,
+    userAnswer: final.userAnswer,
+    Finalized: final.Finalized
+  });
+
+  // ใช้ logic เดิมใน renderLatest ที่คุณมีอยู่แล้ว
+  renderLatest(final);
+}
+
 function checkActivity(){ if(!state.sap){ $('#actTodayCard').style.display='none'; return; } $('#actTodayCard').style.display='block'; const pick=pickAct(); $('#btnActNow').disabled=!pick; renderActList(); }
 $('#btnActNow').onclick=()=>{ const pick=pickAct(); if(!pick){ $('#btnActNow').disabled=true; return; } if(pick.twoStep==='clinPair'){ openActSelector(pick); } else { openAct(pick); } };
 
@@ -2312,8 +2346,43 @@ function normalizeProtocolTitle(rawTitle){
     .trim() || t;
 }
 
-function mapWeeklyRow(it){ const dateText=String(it.dateISO||it.ts||it.timestamp||it.Date||it.date||it.time||''); const actId=String(it.actId||it.ActID||it.ActivityId||it.activityId||it.setId||it.GroupId||it.FormId||''); let rawTitle=String(it.title||it.Title||it.ActivityTitle||it.FormTitle||it.name||it.question||'');
-  let title = normalizeProtocolTitle(rawTitle); if(!title && actId){ const meta=getActMetaById(actId); if(meta) title=meta.Title||meta.Question||''; } const r=(it.result ?? it.Result ?? it.correct ?? it.Correct); let result=null; if(r===true || String(r).toLowerCase()==='true' || String(r)==='1') result=true; if(r===false || String(r).toLowerCase()==='false' || String(r)==='0') result=false; const points=Number(it.points ?? it.Points ?? it.point ?? it.award ?? it.Award ?? it.pointsAwarded ?? it.Score ?? 0) || 0; return { dateText, actId, title, result, points }; }
+function mapWeeklyRow(it){
+  const dateText = String(
+    it.dateISO || it.ts || it.timestamp || it.Date || it.date || it.time || ''
+  );
+  const actId = String(
+    it.actId || it.ActID || it.ActivityId || it.activityId ||
+    it.setId || it.GroupId || it.FormId || ''
+  );
+
+  let rawTitle = String(
+    it.title || it.Title || it.ActivityTitle || it.FormTitle ||
+    it.name || it.question || ''
+  );
+
+  let title = normalizeProtocolTitle(rawTitle);
+  if (!title && actId){
+    const meta = getActMetaById(actId);
+    if (meta) title = meta.Title || meta.Question || '';
+  }
+
+  const r = (it.result ?? it.Result ?? it.correct ?? it.Correct);
+  let result = null;
+  if (r === true || String(r).toLowerCase() === 'true' || String(r) === '1') result = true;
+  if (r === false || String(r).toLowerCase() === 'false' || String(r) === '0') result = false;
+
+  const points = Number(
+    it.points ?? it.Points ?? it.point ??
+    it.award  ?? it.Award  ?? it.pointsAwarded ?? it.Score ?? 0
+  ) || 0;
+
+  const userAnswer =
+    it.userAnswer   ?? it.UserAnswer   ??
+    it.answerUser   ?? it.AnswerUser   ??
+    it.answer       ?? it.Answer       ?? null;
+
+  return { dateText, actId, title, result, points, userAnswer };   // ✅ เพิ่ม userAnswer ออกไป
+}
 
 async function wireWeeklyRealtime(){
   const FB = await ensureFirebase();
@@ -2341,8 +2410,7 @@ async function wireWeeklyRealtime(){
 }
 
 /* ========= Annual (อ่านจาก annualByUser แบบ 004) ========= */
-
-function wireAnnualRealtime(){
+  function wireAnnualRealtime(){
   const sap = (state && state.sap || '').trim();
   if (!sap) return;
 
