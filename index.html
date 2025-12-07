@@ -261,15 +261,16 @@ body.is-login main{
   }
 }
 
-
 /* ===== Top20 table ===== */
-.top20-table thead th{ text-align:center !important; }  /* หัวตารางชิดกลาง */
+.top20-table thead th{ 
+  text-align:center !important; 
+}
 
 .top20-table th:nth-child(1),
 .top20-table td:nth-child(1),
 .top20-table th:nth-child(3),
 .top20-table td:nth-child(3){
-  width:76px;           /* ปรับเป็น 70/80 ได้ */
+  width:76px;
   text-align:center;
 }
 
@@ -278,14 +279,134 @@ body.is-login main{
   .top20-table th:nth-child(1),
   .top20-table td:nth-child(1),
   .top20-table th:nth-child(3),
-  .top20-table td:nth-child(3){ width:70px }
+  .top20-table td:nth-child(3){
+     width:70px;
+  }
 }
 @media (max-width:420px){
   .top20-table th:nth-child(1),
   .top20-table td:nth-child(1),
   .top20-table th:nth-child(3),
-  .top20-table td:nth-child(3){ width:64px }
+  .top20-table td:nth-child(3){
+     width:64px;
+  }
 }
+
+/* ===== กรอบคำถามสีน้ำเงินรอบนอก ===== */
+.latest{
+  border:1px dashed var(--line);
+  background:#f0f6ff;             /* ฟ้านวล */
+  border-radius:12px;
+  padding:8px 10px;                /* 🔥 ลดบนล่างจาก 10–14 → 8–10 */
+  margin-bottom:10px;
+}
+
+/* ===== Card แสดงคำถามกิจกรรม (ชิดขอบมากขึ้น) ===== */
+.act-item{
+  border:1px solid #e0e6ef;
+  border-radius:10px;
+  background:#ffffff;
+  padding:8px 12px;              /* 🔥 ลด padding ให้กล่องดู compact */
+  margin:6px 0;             /* 🔥 ลดระยะห่างบน-ล่าง */
+  box-shadow:0 2px 4px rgba(0,0,0,0.03);
+}
+
+/* เว้นระยะภายในแต่ละบรรทัดให้อ่านง่ายขึ้น */
+.act-item div{
+  margin:2px 0;
+}
+
+.act-item + .act-item{
+  border-top:1px dashed #d9dde3;
+  padding-top:10px;
+}
+
+/* label หัวข้อ */
+.lbl{
+  color:#3A6B8A !important;
+  font-weight:700 !important;
+}
+
+/* ระยะบรรทัดรวม */
+.act-item div{
+  margin:4px 0;
+}
+
+/* ========== ปรับปุ่มกิจกรรมวันนี้ให้เล็กลงและอยู่ในแถวเดียวสวยงาม ========== */
+
+.act-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.row.activity-buttons{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+#btnActNow,
+#btnWinners,
+#btnLottoAll{
+    flex:1;                              /* 🔥 ทำให้กว้างเท่ากัน */
+    text-align:center;
+    font-size:14px;
+    padding:10px 0;
+    border-radius:12px;
+    background:#1f6fff;
+    color:#fff;
+    font-weight:600;
+    border:none;
+    box-shadow:0 4px 10px rgba(0,0,0,.12); /* มิติ */
+    transition:.25s;
+}
+
+/* hover effect */
+#btnActNow:hover,
+#btnWinners:hover,
+#btnLottoAll:hover{
+    transform:translateY(-2px);
+    filter:brightness(1.05);
+}
+
+/* ปุ่มสีจาง */
+#btnActNow{
+    background:#dfe7ff;
+    color:#3a4a90;
+}
+
+/* Responsive Tablet */
+@media(max-width:820px){
+    #btnActNow,#btnWinners,#btnLottoAll{
+        font-size:13px;
+        padding:9px 0;
+    }
+}
+
+/* Responsive Mobile */
+@media(max-width:600px){
+    #btnActNow,#btnWinners,#btnLottoAll{
+        font-size:12px;
+        padding:8px 0;
+        border-radius:10px;
+    }
+}
+
+/* หน้าจอเล็กมาก */
+@media(max-width:420px){
+    #btnActNow,#btnWinners,#btnLottoAll{
+        font-size:11px;
+        padding:6px 0;
+    }
+}
+.act-actions{ flex-wrap:nowrap; overflow-x:auto; }
+
+/* แต้มที่ได้รับให้เป็นตัวปกติ */
+.pts {
+  font-weight:400 !important;
+}
+
 </style>
 
 </head>
@@ -345,12 +466,20 @@ body.is-login main{
   <!-- Today / Activities -->
   <section id="actTodayCard" class="card" style="display:none">
     <h3>🍀 กิจกรรมวันนี้</h3>
-    <div id="actLatest" class="latest" style="display:none"></div>
+    <div id="actLatest" class="latest" style="display:none">
+    <div class="act-item">
+      <div><b class="title"></b></div>
+      <div>คำตอบของคุณ: <span class="userAnswer"></span></div>
+      <div>ผลลัพธ์: <span class="result"></span></div>
+      <div>แต้มที่ได้รับ: <b class="pts">0</b> <span class="bonus"></span></div>
+    </div>
+  </div>
+
     <div id="actTodayInfo" class="muted" style="display:none"></div>
-    <div class="row" style="margin-top:8px">
+    <div class="row activity-buttons" style="margin-top:8px">
       <button id="btnActNow">คำถามตอนนี้</button>
-      <button id="btnWinners">Top 20 ถูกและเร็ว (วันนี้)</button>
-      <button id="btnLottoAll">ถูกเลข 2 หลัก</button>
+      <button id="btnWinners">Top20 Today</button>
+      <button id="btnLottoAll">ถูกเลขท้าย</button>
     </div>
     <div id="actList" style="margin-top:10px;display:none"></div>
   </section>
@@ -482,13 +611,24 @@ const ADMIN_PAGE_URL = "https://sianesth.github.io/Admin_reward/";
 // ⬇️ IMPORTANT: อัปเดตเป็น URL ของ Web App (Deployment ล่าสุด) ลงท้ายด้วย /exec
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOW_Wk7bZYb3zG4qRciOENbBSMo2TRdfdJxXzC1C5tRxav1R_dlF5SuuXKoEkJi84Ig/exec';
 
-// ===== ใส่แทนที่ฟังก์ชันเดิมทั้งบล็อก =====
 async function postSubmissionToSheet(payload) {
   const url = (typeof SCRIPT_URL !== 'undefined') ? SCRIPT_URL : '';
   if (!url) {
     console.error('SCRIPT_URL missing');
     return { ok: false, error: 'SCRIPT_URL missing' };
   }
+
+  /* ⭐⭐⭐ (H1) กันตอบซ้ำฝั่ง client – วางตรงนี้ ⭐⭐⭐ */
+  const today = todayKey('Asia/Bangkok');
+  const SAP = localStorage.getItem('SAP') || state.sap;
+  const k = `ans:${today}:${SAP}:${payload.actId}`;
+
+  if(localStorage.getItem(k)){
+     toast("วันนี้คุณตอบกิจกรรมนี้แล้ว");
+     return {ok:false, error:"already_answered_today"};
+  }
+ 
+  localStorage.setItem(k,"1");  // ตั้ง flag กันกดซ้ำทันที
 
   try {
     const res = await fetch(url, {
@@ -546,15 +686,98 @@ async function postSubmissionToSheet(payload) {
     }
 
     // ====== แสดงผลลัพธ์ทันทีถ้า server ให้สถานะ correct กลับมา ======
-    if (data && data.ok && data.correct != null && typeof showAnswerResult === 'function') {
-      if (data.correct === 'TRUE') {
+if (data && data.ok && data.correct != null && typeof showAnswerResult === 'function') {
+    if (data.correct === 'TRUE') {
         showAnswerResult(true, Number(data.points || 0));
-      } else if (data.correct === 'FALSE') {
+    } else if (data.correct === 'FALSE') {
         showAnswerResult(false, 0);
-      } else {
+    } else {
         showAnswerResult(null, 0); // PENDING
-      }
     }
+}
+
+/* -----------------------------------------------------
+   ⭐ แสดงกล่องกิจกรรมวันนี้ทันที ไม่ต้อง Refresh
+----------------------------------------------------- */
+try {
+    renderLatest([{
+        actId: payload.actId,
+        title: payload.title || state.currentQuestion?.title,
+        userAnswer: payload.answer,
+        result: data.correct === 'TRUE' ? true : data.correct === 'FALSE' ? false : null,
+        points: Number(data.points || 0),
+        bonus: Number(data.bonus || 0),
+        dateISO: todayKey()
+    }]);
+
+    addOrUpdateWeekly({
+        dateISO: todayKey(),
+        actId: payload.actId,
+        title: payload.title,
+        result: data.correct === 'TRUE',
+        points: Number(data.points || 0),
+        bonus: Number(data.bonus || 0)
+    });
+} catch(err){
+    console.warn("Render immediate failed:", err);
+}
+
+
+/* -----------------------------------------------------
+   ⭐ อัปเดตแต้มในกล่องกิจกรรมทันที (Optimistic UI)
+----------------------------------------------------- */
+try {
+    const box = document.querySelector('#actLatest');
+    if (box) {
+        const pts = box.querySelector('.pts');
+        const bonus = box.querySelector('.bonus');
+        if (pts)   pts.textContent   = Number(data.points || 0);
+        if (bonus) bonus.textContent = Number(data.bonus || 0);
+    }
+} catch(err){
+    console.warn("Update score UI failed:", err);
+}
+
+/* ⭐⭐⭐ (H3) อัปเดต KPI หน้าเว็บทันที ⭐⭐⭐ */
+try{
+    state.user.PointsEarned += Number(data.points||0);
+    state.user.PointsTotal  = state.user.PointsEarned - state.user.PointsUsed;
+    if(typeof renderKPI === "function") renderKPI();   // คะแนนบนหัวหน้าเว็บจะกระเด้งทันที
+}catch(e){}
+
+/* ⭐ อัปเดตกล่องกิจกรรมวันนี้ทันที (ไม่ต้องรีเฟรช) ⭐ */
+try{
+    addOrUpdateWeekly({
+        dateISO: todayKey(),
+        actId: payload.actId,
+        userAnswer: payload.answer,
+        result: data.correct === 'TRUE',
+        points: Number(data.points||0),
+        bonus: Number(data.bonus||0)
+    });
+
+    // รีเฟรชกล่อง activity โดยใช้ weeklyLocal เหมือน Weekly Report
+    const weeklyLocal = loadWeekly().filter(r => isToday(r.dateISO || r.ts));
+    if(weeklyLocal.length>0){
+        renderLatest(weeklyLocal);
+    }
+
+    // เปลี่ยนตัวเลขคะแนนที่แสดงในกล่อง activity ให้ตรงทันที
+    const ptsEl = document.querySelector("#actLatest .pts");
+    if(ptsEl) ptsEl.textContent = Number(data.points||0);
+
+}catch(e){ console.log("Instant Activity Update Failed",e); }
+
+    /* ============================================================
+   ⭐ ใส่โค้ดนี้ตรงนี้พอดี — ล็อก Clinic/Non-clinic ทันทีหลังตอบ
+   ============================================================ */
+    try {
+      const meta = getActMetaById(payload.actId);
+      const pk = meta ? pairKeyOf(meta) : null;
+      if (pk) {
+          localStorage.setItem(clinPairStoreKey(pk), "1");
+      }
+    } catch (_) {}
 
     // ส่งต่อผลลัพธ์ให้ผู้เรียกใช้งาน
     if (data) return data;
@@ -567,6 +790,14 @@ async function postSubmissionToSheet(payload) {
     return { ok: false, error: String(e) };
   }
 }
+
+// ⭐ อัปเดตกิจกรรมล่าสุดทันทีหลังส่ง
+setTimeout(() => {
+  if(typeof renderLatest==="function"){
+      const weeklyLocal = loadWeekly().filter(r => isToday(r.dateISO||r.ts));
+      renderLatest(weeklyLocal);   // ไม่ต้อง refresh แล้ว
+  }
+},200);
 
 // แปลงค่า Status จากชีทให้เป็น boolean
 function isActiveStatus(val){
@@ -1010,21 +1241,33 @@ function isTodayLocal(str){ const t=parseLocal(str); if(Number.isNaN(t)) return 
 function hasAns(id){
   if(!id) return false;
 
+  // --- กันตอบซ้ำระหว่าง Protocol & Non-Protocol ---  
+  const meta = getActMetaById(id);
+  const pairKey = meta ? pairKeyOf(meta) : null;
+  if (pairKey) {
+      const clinKey = clinPairStoreKey(pairKey);
+      if (localStorage.getItem(clinKey)) return true;
+  }
+
   // แบบเดิม
   if(localStorage.getItem(aKey(id))) return true;
 
-  // ✅ ดูคีย์รูปแบบที่สองด้วย: ans:YYYY-MM-DD:SAP:ActID (ใช้โซนเวลาไทย)
+  // คีย์รูปแบบ ans:YYYY-MM-DD:SAP:ActID
   const k2 = `ans:${todayKey('Asia/Bangkok')}:${state.sap||''}:${id}`;
   if(localStorage.getItem(k2)) return true;
 
-  // เผื่อกรณีส่งไปแล้วในวันนี้ (optimistic)
+  // ส่งไปแล้วในวันนี้ (optimistic)
   const x = state.lastSubmission;
   if(!x) return false;
   const same = String(x.actId||'') === String(id||'');
   const ts   = x.ts || x.timestamp;
   if(!ts) return false;
+
   const d = new Date(ts), n = new Date();
-  return same && d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
+  return same &&
+         d.getFullYear()===n.getFullYear() &&
+         d.getMonth()===n.getMonth() &&
+         d.getDate()===n.getDate();
 }
 
 function titleClinType(t){ const s=String(t||'').toLowerCase(); if(/\bnon[-\s]?clinical\b/.test(s) || /(non[-\s]?clinical)/i.test(t)) return 'nonclin'; if(/\bclinic\b/.test(s) || /\bclinical\b/.test(s) || /(clinic)/i.test(t)) return 'clin'; return null; }
@@ -1182,6 +1425,19 @@ function renderRewards(){
   document.querySelectorAll('.btnRedeem').forEach(b=>{
     b.onclick = () => { if(b.disabled) return; createQR(b.dataset.name, Number(b.dataset.need||0)); };
   });
+}
+
+// ⭐⭐⭐ วางฟังก์ชัน loadUsersMap() ตรงนี้ ⭐⭐⭐
+async function loadUsersMap(){
+    const FB = await ensureFirebase();
+    const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
+    const obj = snap.val() || {};
+    const map = {};
+    Object.keys(obj).forEach(sap=>{
+        const u = obj[sap];
+        map[sap] = u.name || u.Name || u.fullName || sap;
+    });
+    return map;
 }
 
 /* ========= Top 20 (dialog) ========= */
@@ -1568,14 +1824,36 @@ $('#btnWinners').onclick = async () => {
       const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
       const users = snap.val() || {};
 
-      const rows = winners.map((w, idx) => {
-        const sap  = String(w.sap || w.SAP || '').trim();
-        const u    = sap ? (users[sap] || {}) : {};
-        const name = String(
-          u.name || u.Name || u.fullName || u.FullName || sap || '-'
-        ).trim();
-        return [idx + 1, name];
-      });
+const rows = winners.map((w, idx) => {
+    // หาค่า sap ที่แท้จริง (รองรับทุกกรณีของ winnersByDate)
+    let sap = '';
+
+    if (w.sap) sap = String(w.sap).trim();
+    else if (w.SAP) sap = String(w.SAP).trim();
+    else if (w.user || w.User) sap = String(w.user || w.User).trim();
+    else if (typeof w === 'string') sap = w.trim();
+    else if (typeof w === 'object') {
+        // หา key ที่เป็น sap ภายใน object ซ้อน
+        for (const k in w) {
+            if (k.toLowerCase().includes('sap')) {
+                sap = String(w[k]).trim();
+                break;
+            }
+        }
+    }
+
+    // ถ้ายังไม่เจอ sap เลย → ใส่ '-'
+    if (!sap) sap = '-';
+
+    // ดึงข้อมูลผู้ใช้
+    const u = users[sap] || {};
+
+    const name = String(
+        u.fullName || u.name || u.Name || sap
+    ).trim();
+
+    return [idx + 1, name];
+});
 
       const thead = `
         <thead>
@@ -1652,13 +1930,10 @@ $('#btnWinners').onclick = async () => {
   }
 };
 
-// ปุ่ม "ถูกเลข 2 หลัก"
-// - วันหวยออก: ถ้ายังไม่เฉลย → "รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา"
-// - วันถัดไป: แสดงรายชื่อผู้ถูกของ "งวดเมื่อวาน"
-// - เลยมาเกิน 1 วัน และยังไม่มีงวดใหม่ → "รอรอบหวยออกครั้งถัดไปก่อนนะคะ"
+// ปุ่ม "ถูกเลข 2 หลัก" — แสดงชื่อ-นามสกุล
 $('#btnLottoAll').onclick = async () => {
   const tz        = 'Asia/Bangkok';
-  const today     = todayKey(tz);               // YYYY-MM-DD
+  const today     = todayKey(tz);
   const now       = new Date();
   const yesterday = dayKeyFromDate(
     new Date(now.getTime() - 24*60*60*1000),
@@ -1671,7 +1946,6 @@ $('#btnLottoAll').onclick = async () => {
     let usedDate = today;
     let winners  = await loadLottoCorrectForDate(today);
 
-    // กรณีวันนี้มี lotto แต่ยังไม่มีผลเฉลย → ยังรออยู่
     if (!winners.length && hasLottoToday) {
       $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)';
       $('#dlgTopBody').textContent  = 'รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา';
@@ -1679,13 +1953,11 @@ $('#btnLottoAll').onclick = async () => {
       return;
     }
 
-    // ไม่มี lotto วันนี้ → ลองดูงวดเมื่อวาน (ใช้โชว์ต่ออีก 1 วัน)
     if (!winners.length) {
       winners  = await loadLottoCorrectForDate(yesterday);
       usedDate = yesterday;
     }
 
-    // ถ้ายังไม่มีอีก → ถือว่าเลยงวดล่าสุดแล้ว
     if (!winners.length) {
       $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก';
       $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
@@ -1693,13 +1965,12 @@ $('#btnLottoAll').onclick = async () => {
       return;
     }
 
-    // มีรายชื่อแล้ว
     $('#dlgTopTitle').textContent =
       (usedDate === today)
         ? 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)'
         : 'ผู้ที่ตอบถูกเลข 2 หลัก (งวดล่าสุด)';
 
-    // ดึงชื่อจาก public/usersSummary
+    // โหลด usersSummary เพื่อแปลง SAP -> ชื่อ-นามสกุล
     const FB   = await ensureFirebase();
     const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
     const users = snap.val() || {};
@@ -1708,9 +1979,9 @@ $('#btnLottoAll').onclick = async () => {
       .sort((a,b) => new Date(a.ts || 0) - new Date(b.ts || 0))
       .map((w, idx) => {
         const sap  = String(w.sap || w.SAP || '').trim();
-        const u    = sap ? (users[sap] || {}) : {};
+        const u    = users[sap] || {};
         const name = String(
-          u.name || u.Name || u.fullName || u.FullName || sap || '-'
+          u.fullName || u.name || u.Name || sap
         ).trim();
         return [idx + 1, name];
       });
@@ -1860,6 +2131,8 @@ function openActSelector(group){ const box=$('#chooseBody'); box.innerHTML=group
 function openAct(act){
   actOpen=true; const id=act.ActID||act.id||act.actId; const t=String(act.InputType||'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
   $('#actTitle').textContent=(act.Question||act.Title||''); $('#actQuestion').style.display='none'; $('#actQuestion').textContent=''; $('#actStatus').textContent=''; const box=$('#actOpts');
+  
+  // ส่วนสร้าง UI Input (คงเดิม)
   if(['NUM2','NUM','NUMBER','NUMERIC'].includes(t)) { box.innerHTML=`<input id="actText" placeholder="กรอกตัวเลข 2 หลัก" maxlength="2" inputmode="numeric" style="width:140px;text-align:center">`; setTimeout(()=>{ const inp=$('#actText'); try{ inp.focus(); }catch{}; inp.addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d]/g,'').slice(0,2)); inp.addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnActSubmit').click(); }); },0); }
   else if(t==='TEXT') { box.innerHTML=`<input id="actText" placeholder="พิมพ์คำตอบ" style="width:100%">`; setTimeout(()=>{ try{$('#actText').focus();}catch{} },0); }
   else {
@@ -1881,7 +2154,7 @@ function openAct(act){
     if (_submitting) return;
     _submitting = true;
 
-    let success = false;   // จะใช้เช็คว่ามีการบันทึกสำเร็จจริงไหม
+    let success = false;   
 
     try {
       const id = act.ActID || act.id || act.actId;
@@ -1930,7 +2203,7 @@ function openAct(act){
         client: 'web-anesa+'
       };
 
-      // ===== 3) เดาผล "ถูก/ผิด" เพื่อโชว์ในกล่องล่าสุด (แต่ไม่ยุ่ง KPI) =====
+      // ===== 3) เดาผล "ถูก/ผิด" (Optimistic UI) =====
       const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
       const hasAnswer = String(act.Answer || '').trim() !== '';
       const instantOK = (!isNumeric && hasAnswer && typeof clientIsCorrect === 'function')
@@ -1950,7 +2223,8 @@ function openAct(act){
       };
 
       state.lastSubmission = optimistic;
-      renderLatest(optimistic);
+      
+      // บันทึกแบบเดาไปก่อน
       addOrUpdateWeekly({
         dateISO: ts,
         title: optimistic.title,
@@ -1960,6 +2234,8 @@ function openAct(act){
         userAnswer: ans,
         Finalized: false
       });
+      // แสดงผลแบบเดาไปก่อน
+      (optimistic);
 
       $('#actModal').style.display = 'none';
       actOpen = false;
@@ -2014,7 +2290,8 @@ function openAct(act){
         };
 
         state.lastSubmission = final;
-        renderLatest(final);
+
+        // 🔥 [แก้ไขจุดที่ 1] บันทึกข้อมูลจริงลง Storage ก่อน
         addOrUpdateWeekly({
           dateISO: ts,
           title: final.title,
@@ -2024,6 +2301,9 @@ function openAct(act){
           userAnswer: ans,
           Finalized: final.Finalized
         });
+
+        // 🔥 [แก้ไขจุดที่ 1] แล้วค่อยวาดหน้าจอ
+        renderLatest(final);
 
       } else {
         // ===== 7) fallback → ยิง submit ตรงไป Apps Script =====
@@ -2055,7 +2335,8 @@ function openAct(act){
           };
 
           state.lastSubmission = final;
-          renderLatest(final);
+          
+          // 🔥 [แก้ไขจุดที่ 2] บันทึกข้อมูลจริงลง Storage ก่อน
           addOrUpdateWeekly({
             dateISO: ts,
             title: final.title,
@@ -2065,6 +2346,9 @@ function openAct(act){
             userAnswer: ans,
             Finalized: true
           });
+
+          // 🔥 [แก้ไขจุดที่ 2] แล้วค่อยวาดหน้าจอ
+          renderLatest(final);
         }
       }
 
@@ -2109,6 +2393,7 @@ function openAct(act){
 
   $('#btnActClose').onclick=()=>{ $('#actModal').style.display='none'; actOpen=false; };
 }
+
 // แปลงตัวอักษรคำตอบ (A/B/C/D หรือ ก/ข/ค/ง) ให้ติดข้อความตัวเลือก
 function mapAnswerText(act, raw){
   const K = String(raw||'').trim().toUpperCase();
@@ -2136,171 +2421,198 @@ function mapAnswerText(act, raw){
   return raw;
 }
 
-function renderLatest(seed){
+function isAnsweredToday(actId){
+  const weekly = loadWeekly().filter(r => {
+    const ts = r.dateISO || r.ts || r.timestamp;
+    return isToday(ts);
+  });
+
+  // ถ้ามี actId แสดงว่าเคยตอบแล้ว
+  return weekly.some(r => String(r.actId) === String(actId));
+}
+
+function showAnswerInstant(question, yourAnswer, correctAnswer, isCorrect, points){
+    const box = document.querySelector("#actLatest");
+    if(!box) return;
+
+    const status = isCorrect ? "✔ ถูกต้อง" : "❌ ไม่ถูก";
+    const color  = isCorrect ? "#0a8c4a" : "#d93025";
+
+    const html = `
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:10px;
+                    padding:12px;margin-bottom:10px;font-size:15px;line-height:1.45;">
+            <div><b>คำถาม:</b> ${question}</div>
+            <div><b>คุณตอบ:</b> ${yourAnswer} • <b style="color:${color}">${status}</b></div>
+            <div><b>เฉลย:</b> ${correctAnswer||"-"}</div>
+            <div><b>แต้ม:</b> ${points}</div>
+        </div>
+    `;
+
+    box.innerHTML = html + box.innerHTML;   // แสดงรายการใหม่บนสุด
+    box.style.display = "block";
+}
+
+function renderLatest(latest) {
   const box = $('#actLatest');
   if (!box) return;
 
-  const sap = state.sap || localStorage.getItem('SAP') || '';
-  const tz  = 'Asia/Bangkok';
-  const today     = todayKey(tz);
-  const yesterday = dayKeyFromDate(
-    new Date(Date.now() - 24*60*60*1000),
-    tz
-  );
+const weeklyLocal = loadWeekly().filter(r => {
+  const cat = (r.Category || '').toUpperCase();
+  return cat.includes('LOTTO') ? isTodayOrYesterday(r.dateISO || r.ts)
+                               : isToday(r.dateISO || r.ts);
+});
 
-  // ---- รวมข้อมูลจาก weekly (local) + weeklyRemote (RTDB) ----
-  const mergedByAct = {};
+const weeklyRemote = (state.weeklyRemote || []).filter(r => {
+  const cat = (r.Category || '').toUpperCase();
+  return cat.includes('LOTTO') ? isTodayOrYesterday(r.dateISO || r.ts || r.dateText)
+                               : isToday(r.dateISO || r.ts || r.dateText);
+});
 
-  function addFromRow(r){
-    if (!r) return;
-
-    // เลือก key วันที่ให้ครอบคลุมทุกรูปแบบ
-    const dateText =
-      r.dateText   || r.dateISO  || r.dateIso ||
-      r.ts         || r.timestamp ||
-      r.date       || r.Date     ||
-      r.time       || r.Time     || '';
-
-    const d = anyToDate(dateText);
-    if (!d) return;
-
-    const dayKey = dayKeyFromDate(d, tz);
-
-    const actId =
-      r.actId        || r.ActID        ||
-      r.ActivityId   || r.activityId   ||
-      r.setId        || r.GroupId      ||
-      r.FormId       || '';
-
-    if (!actId) return;
-
-    // เช็คว่า row นี้เป็นกิจกรรมล๊อตโต้หรือไม่
-    const meta  = getActMetaById(String(actId)) || {};
-    const cat   = String(meta.Category || r.Category || '').toUpperCase();
-    const title = String(
-      meta.Title || meta.Question ||
-      r.title || r.Title || ''
-    ).toUpperCase();
-    const input = String(meta.InputType || r.InputType || '').toUpperCase();
-
-    const isLottoRow =
-      /LOTTO/.test(cat) ||
-      /เสี่ยงทาย/.test(title) ||
-      ['NUM2','NUM','NUMBER','NUMERIC'].includes(input);
-
-    const isToday        = (dayKey === today);
-    const isYesterdayLot = (dayKey === yesterday && isLottoRow);
-
-    // ✅ แสดงเฉพาะ
-    //   - ทุกกิจกรรมของ "วันนี้"
-    //   - กิจกรรม "ล๊อตโต้ของเมื่อวาน"
-    if (!isToday && !isYesterdayLot) return;
-
-    const key  = String(actId);
-    const prev = mergedByAct[key] || {};
-
-    const resultRaw = (r.result ?? r.Result ?? r.correct ?? r.Correct);
-    let result = prev.result ?? null;
-    if (resultRaw === true  || String(resultRaw).toLowerCase() === 'true'  || String(resultRaw) === '1') result = true;
-    if (resultRaw === false || String(resultRaw).toLowerCase() === 'false' || String(resultRaw) === '0') result = false;
-
-    const pointsRaw =
-      r.points ?? r.Points ?? r.point ??
-      r.award  ?? r.Award  ?? r.pointsAwarded ?? r.Score;
-
-    mergedByAct[key] = {
-      actId: key,
-      ts: d.toISOString(),
-      title: r.title || r.Title || r.ActivityTitle || r.FormTitle || r.name || prev.title,
-      result,
-      points: (pointsRaw != null ? Number(pointsRaw) || 0 : prev.points),
-      userAnswer: r.userAnswer ?? prev.userAnswer ?? null
-    };
-  }
-
-  // จาก local weekly
-  try {
-    (loadWeekly() || []).forEach(addFromRow);
-  } catch (_) {}
-
-  // จาก weeklyRemote (RTDB)
-  (state.weeklyRemote || []).forEach(addFromRow);
-
-  // seed (ล่าสุดจากการตอบในหน้านี้) ถ้าเป็นของ "วันนี้" ให้ merge เพิ่มด้วย
-  if (seed && seed.actId) {
-    const d = anyToDate(seed.ts || seed.timestamp);
-    if (!d || dayKeyFromDate(d, tz) === today) {
-      const key  = String(seed.actId);
-      const prev = mergedByAct[key] || {};
-      mergedByAct[key] = {
-        ...prev,
-        ...seed,
-        actId: key,
-        ts: seed.ts || seed.timestamp || prev.ts
-      };
+  // รวม + ตัดซ้ำ
+  const pick = {};
+  [...weeklyLocal, ...weeklyRemote].forEach(w => {
+    const actId = String(w.actId || '');
+    const ts = w.dateISO || w.ts || '';
+    if (!pick[actId]) pick[actId] = w;
+    else {
+      const d1 = new Date(pick[actId].dateISO || pick[actId].ts || 0);
+      const d2 = new Date(ts);
+      if (d2 > d1) pick[actId] = w;
     }
-  }
+  });
 
-  const items = Object.values(mergedByAct);
-  if (!items.length){
+  const items = Object.values(pick);
+  if (!items.length) {
+    box.innerHTML = '';
     box.style.display = 'none';
-    box.innerHTML     = '';
     return;
   }
 
-  // เรียงตามเวลาเก่าก่อน → ใหม่ทีหลัง
-  items.sort((a,b) => new Date(a.ts || 0) - new Date(b.ts || 0));
+  const acts = Array.isArray(state.activities)
+    ? state.activities
+    : Object.values(state.activities || {});
 
-  const pieces = items.map(item => {
-    const act   = getActMetaById(item.actId) || {};
-    const rawQ  = act.Question || act.Title || item.title || item.actId || '-';
-    const qText = normalizeProtocolTitle(rawQ) + '';
+  const html = items.map(w => {
+    const act = acts.find(a =>
+      String(a.ActID || a.id || a.actId) === String(w.actId)
+    ) || {};
 
-    const your = (
-      item.userAnswer ||
-      localStorage.getItem(`anes.act.lastAns.${item.actId||''}.${sap}`) ||
-      '—'
-    ) + '';
+    const qText = act.Question || act.Title || w.title || '-';
 
-    // พยายามดึงเฉลยจากหลายแหล่ง เผื่อบางที Answer ใน actIndex ยังไม่อัปเดต
-    let ansKey = String(
-      act.Answer          || act.answer          ||
-      item.correctAnswer  || item.winningNumber  ||
-      item.Answer         || ''
-    ).trim();
+    let userAns = w.userAnswer ||
+      latest?.userAnswer ||
+      localStorage.getItem(`anes.act.lastAns.${w.actId}.${state.sap}`) ||
+      '—';
 
-    const ansText = ansKey ? mapAnswerText(act, ansKey) : '';
+    // --- ตรวจผลถูกผิด ---
+    let corr = null;
+    const rRaw = w.result ?? w.correct;
+    const rStr = String(rRaw ?? '').trim().toLowerCase();
 
-    const corr = (item.correct != null ? item.correct : item.result);
-    const pts  = (item.points == null ? null : Number(item.points) || 0);
-
-    let verdict = '';
-    if (corr === true) {
-      verdict = `<span class="ok">✅ ถูกต้อง</span>${(pts!=null && pts>0)?` • +${pts} แต้ม`:''}`;
-    } else if (corr === false) {
-      if (ansKey) {
-        const isLotto = isLottoAct(act);                // ดูว่าเป็นกิจกรรมล๊อตโต้ไหม
-        const label   = isLotto ? 'เลขท้าย 2 ตัวที่ออก' : 'เฉลย';
-        verdict =
-          `<span class="bad">❌ ไม่ถูก</span> • ${label}: <b>${escapeHtml(ansText)}</b>`;
-      } else {
-        verdict = `<span class="bad">❌ ไม่ถูก</span>`;
-      }
-    } else {
-      verdict = `<span class="muted">⌛ รอตรวจสอบ</span>`;
+    if (rStr === 'true') corr = true;
+    else if (rStr === 'false') corr = false;
+    else {
+      const pts = Number(w.points || 0);
+      corr = pts > 0 ? true : null;
     }
 
-    return `
-      <div>
-        <div><b>คำถามวันนี้:</b> ${escapeHtml(qText)}</div>
-        <div><b>คำตอบของคุณ:</b> ${escapeHtml(your)} • ${verdict}</div>
-      </div>`;
-  });
+    // --- คะแนน + โบนัส ---
+    const pts = Number(w.points || 0);
+    const bonus = Number(w.bonus || act.BonusPoints || 0);
 
-  box.innerHTML = pieces.join(
-    '<hr style="border:none;border-top:1px dashed var(--line);margin:6px 0">'
-  );
+    // --- เฉลย ---
+    const ansKey = String(act.Answer || '').trim().toUpperCase();
+    const optMap = { A: act.OptionA, B: act.OptionB, C: act.OptionC, D: act.OptionD };
+    let correctFull = ansKey;
+
+    if (['A','B','C','D'].includes(ansKey)) {
+      const t = optMap[ansKey];
+      correctFull = t ? `${ansKey}. ${t}` : ansKey;
+    }
+
+    let verdict = '';
+    if (corr === true)
+      verdict = `<span style="color:#0a8c4a;font-weight:600">✔️ ถูกต้อง</span>`;
+    else if (corr === false)
+      verdict = `<span style="color:#d93025;font-weight:600">❌ ไม่ถูก</span>`;
+    else
+      verdict = `<span style="color:#6b78a6">⌛ รอตรวจสอบ</span>`;
+
+return `
+  <div class="act-item">
+    <div><b class="lbl">คำถาม:</b> ${escapeHtml(qText)}</div>
+    <div><b class="lbl">คุณตอบ:</b> ${escapeHtml(userAns)} • ${verdict}</div>
+
+    ${corr === false
+      ? `<div><b class="lbl">เฉลย:</b> ${escapeHtml(correctFull)}</div>`
+      : ''
+    }
+
+    <div><b class="lbl">แต้มที่ได้รับ:</b> 
+        <b class="pts">${pts}</b> 
+        <span class="bonus" style="color:#0a8c4a;font-weight:600">
+            ${bonus>0 ? `(+${bonus})` : ``}
+        </span>
+    </div>
+  </div>
+`;
+
+  }).join('<hr style="border:none;border-top:1px dashed var(--line);margin:6px 0">');
+
+  box.innerHTML = html;
   box.style.display = 'block';
+}
+
+function updateBtnActNow(){
+    const btn = document.getElementById("btnActNow");
+
+    // ตรวจว่ามีกิจกรรมวันนี้หรือไม่
+    const hasAct = state.activities && state.activities.length > 0;
+    const now = Date.now();
+
+    // เงื่อนไขกิจกรรมที่เล่นได้
+    const playable = hasAct && state.activities.some(a=>{
+        return isTodayLocal(a.WindowStart) &&
+               isIn(a.WindowStart,a.WindowEnd) &&
+               !hasAns(a.ActID);
+    });
+
+    if(playable){
+        btn.classList.add("active");
+        btn.classList.remove("disabled");
+        btn.disabled = false;
+    }else{
+        btn.classList.remove("active");
+        btn.classList.add("disabled");
+        btn.disabled = true;
+    }
+}
+
+// เรียกใช้หลังโหลดข้อมูลกิจกรรม
+setTimeout(updateBtnActNow,600);
+
+/* ตรวจว่าวันนี้ */
+function isToday(ts){
+  if (!ts) return false;
+  const d=new Date(ts), n=new Date();
+  return d.getFullYear()===n.getFullYear() &&
+         d.getMonth()===n.getMonth() &&
+         d.getDate()===n.getDate();
+}
+/* ตรวจว่าเมื่อวาน */
+function isYesterday(ts){
+  if (!ts) return false;
+  const d=new Date(ts);
+  const y=new Date(); 
+  y.setDate(y.getDate()-1); // เมื่อวาน
+
+  return d.getFullYear()===y.getFullYear() &&
+         d.getMonth()===y.getMonth() &&
+         d.getDate()===y.getDate();
+}
+// ใช้ได้ทั้งวันนี้และเมื่อวาน (สำหรับ LOTTO)
+function isTodayOrYesterday(ts){
+  return isToday(ts) || isYesterday(ts);
 }
 
 // แสดงผลหลัง server ส่ง correct (TRUE/FALSE/PENDING) กลับมา
@@ -2320,7 +2632,12 @@ function showAnswerResult(isCorrect, points){
   state.lastSubmission = final;
   saveLatestCache(final);
 
-  // อัปเดตรายงานสัปดาห์ให้ตรงกับผลจริง
+  // ⭐ บวกแต้มแบบ realtime (กรณีตอบถูก)
+  if(isCorrect === true && points>0){
+      applyKPIDelta(points,0);
+  }
+
+  // ⭐ update weekly local ให้ renderLatest() ดึงไปใช้ได้ทันที
   addOrUpdateWeekly({
     dateISO: final.ts,
     title: final.title,
@@ -2331,12 +2648,45 @@ function showAnswerResult(isCorrect, points){
     Finalized: final.Finalized
   });
 
-  // ใช้ logic เดิมใน renderLatest ที่คุณมีอยู่แล้ว
-  renderLatest(final);
+  // ⭐⭐⭐ จุดสำคัญ ทำให้หน้ากิจกรรมวันนี้เห็นแต้มแบบทันที⭐⭐⭐
+  renderLatest({
+    actId: final.actId,
+    title: final.title,
+    userAnswer: final.userAnswer,
+    result: final.correct,
+    points: final.points,
+    bonus: 0
+  });
 }
 
-function checkActivity(){ if(!state.sap){ $('#actTodayCard').style.display='none'; return; } $('#actTodayCard').style.display='block'; const pick=pickAct(); $('#btnActNow').disabled=!pick; renderActList(); }
-$('#btnActNow').onclick=()=>{ const pick=pickAct(); if(!pick){ $('#btnActNow').disabled=true; return; } if(pick.twoStep==='clinPair'){ openActSelector(pick); } else { openAct(pick); } };
+function checkActivity(){
+  if(!state.sap){
+    $('#actTodayCard').style.display='none';
+    return;
+  }
+  $('#actTodayCard').style.display='block';
+  const pick=pickAct();
+  $('#btnActNow').disabled=!pick;
+  renderActList();
+}
+
+$('#btnActNow').onclick=()=>{
+  const pick0 = pickAct();
+  if (pick0 && hasAns(pick0.actId)) {
+      toast("วันนี้คุณตอบกิจกรรมนี้แล้ว", 3000);
+      return;
+  }
+  const pick=pickAct();
+  if(!pick){
+    $('#btnActNow').disabled=true;
+    return;
+  }
+  if(pick.twoStep==='clinPair'){
+    openActSelector(pick);
+  } else {
+    openAct(pick);
+  }
+};
 
 function normalizeProtocolTitle(rawTitle){
   const t = String(rawTitle || '');
@@ -2615,6 +2965,90 @@ function fmtThaiDate(d){
         year:'numeric'
       })
     : '—';
+}
+
+// ใน User_006_fixed3.11.html: วางโค้ดนี้ต่อจากฟังก์ชัน fmtThaiDate
+// **********************************************
+
+function shouldActivityBeHidden(act, todayKey, hasAnswered) {
+    if (!act.Active || act.Active.toUpperCase() === 'FALSE') {
+        return true; // ซ่อนกิจกรรมที่ตั้งค่าเป็น Non-Active
+    }
+
+    const wsKey = act.WindowStart ? act.WindowStart.substring(0, 10) : '';
+    const weKey = act.WindowEnd ? act.WindowEnd.substring(0, 10) : '';
+
+    // ตรวจสอบว่าเป็นกิจกรรม LOTTO หรือไม่ (ใช้ Category หรือ GroupId)
+    const isLotto = String(act.Category || '').toUpperCase().includes('LOTTO');
+
+    // -----------------------------------------------------
+    // LOGIC สำหรับกิจกรรม LOTTO: แสดงต่ออีก 1 วัน
+    // -----------------------------------------------------
+    if (isLotto) {
+        // 1. ถ้ายังไม่ถึงวันกิจกรรม (WindowStart) ให้ซ่อน
+        if (wsKey && wsKey > todayKey) return true;
+
+        // 2. ถ้าอยู่ในช่วงกิจกรรม (WindowStart ถึง WindowEnd) ให้แสดง
+        if ((!wsKey || wsKey <= todayKey) && weKey >= todayKey) return false;
+
+        // 3. ตรวจสอบว่าพ้น WindowEnd มาแล้ว '1 วัน' หรือไม่ (แสดงผลวันสุดท้าย)
+        if (weKey) {
+            // ใช้ฟังก์ชัน parseDateFlexible_ และ fmtDayKey ที่มีอยู่ในโค้ด
+            const endDate = parseDateFlexible_(weKey); 
+            if (endDate) {
+                const dayAfterEnd = new Date(endDate);
+                dayAfterEnd.setDate(endDate.getDate() + 1);
+                const dayAfterEndKey = fmtDayKey(dayAfterEnd); 
+
+                // ถ้าวันนี้คือวันถัดจาก WindowEnd
+                if (dayAfterEndKey === todayKey) {
+                    return false;
+                }
+            }
+        }
+        
+        // 4. ถ้าเลยวันแสดงผลสุดท้ายไปแล้ว ให้ซ่อน
+        return true; 
+    }
+    // -----------------------------------------------------
+
+    // LOGIC สำหรับกิจกรรมทั่วไป (Choice)
+    if (wsKey && wsKey > todayKey) return true; // ยังไม่ถึงวันกิจกรรม
+    if (weKey && weKey < todayKey) return true; // พ้นวันกิจกรรม
+    if (hasAnswered) return true; // ซ่อนกิจกรรมที่ผู้ใช้ตอบแล้ว
+    
+    return false;
+}
+
+// ⭐ แปลงข้อมูล submission ล่าสุดให้เหมือน Weekly Format สำหรับ renderLatest_v3
+function renderLatestInstant(answerPayload, result, points){
+    const obj = {
+        actId: answerPayload.actId,
+        title: answerPayload.title || state.currentQuestion?.title,
+        userAnswer: answerPayload.answer,
+        result: result===true ? true : result===false ? false : null,
+        points: Number(points||0),
+        bonus: 0,
+        dateISO: new Date().toISOString(),
+    };
+
+    console.log("Render instant >>>",obj);
+    renderLatest([obj]);   // ใช้ renderLatest_v3 เดิม ไม่ต้องแก้ฟังก์ชัน
+}
+
+function updateActNowButton(isAvailable){
+  const btn = document.getElementById('btnActNow');
+  if(!btn) return;
+
+  if(isAvailable){
+    btn.classList.add('active');
+    btn.classList.remove('disabled');
+    btn.disabled = false;
+  } else {
+    btn.classList.remove('active');
+    btn.classList.add('disabled');
+    btn.disabled = true;
+  }
 }
 
 </script>
