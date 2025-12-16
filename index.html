@@ -1946,12 +1946,14 @@ $('#btnLottoAll').onclick = async () => {
     let usedDate = today;
     let winners  = await loadLottoCorrectForDate(today);
 
+  // ✅ เฉลยแล้ว แต่ไม่มีใครถูก
     if (!winners.length && hasLottoToday) {
-      $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)';
-      $('#dlgTopBody').textContent  = 'รอเฉลยเลขท้าย 2 ตัวก่อนน๊าาาาาา';
+      $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว (วันนี้)';
+      $('#dlgTopBody').textContent  = 'งวดนี้ไม่มีใครถูกเลยค่ะ เสียใจอ่ะ';
       $('#dlgTop').showModal();
       return;
     }
+
 
     if (!winners.length) {
       winners  = await loadLottoCorrectForDate(yesterday);
@@ -1959,7 +1961,7 @@ $('#btnLottoAll').onclick = async () => {
     }
 
     if (!winners.length) {
-      $('#dlgTopTitle').textContent = 'ผู้ที่ตอบถูกเลข 2 หลัก';
+      $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว';
       $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
       $('#dlgTop').showModal();
       return;
@@ -2499,10 +2501,14 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
 
     const qText = act.Question || act.Title || w.title || '-';
 
-    let userAns = w.userAnswer ||
-      latest?.userAnswer ||
-      localStorage.getItem(`anes.act.lastAns.${w.actId}.${state.sap}`) ||
-      '—';
+  let userAns =
+    w.Answer ??                 // ⭐ ตัวนี้คือของจริงจาก Submissions
+    w.userAnswer ??
+    w.ans ??
+    w.answer ??
+    latest?.userAnswer ??
+    localStorage.getItem(`anes.act.lastAns.${w.actId}.${state.sap}`) ??
+    '—';
 
     // --- ตรวจผลถูกผิด ---
     let corr = null;
@@ -2832,6 +2838,23 @@ function renderAnnual(){
     return;
   }
 
+// ⭐ FIX: กันข้อมูลซ้ำในรายงานประจำปี (Form เดิม + วันเดียวกัน)
+const seen = new Set();
+rows = rows.filter(r => {
+  const name =
+    r.Title      ?? r.title      ??
+    r.FormTitle  ?? r.formTitle  ??
+    r.FormName   ?? r.formName   ??
+    r.name       ?? '';
+
+  const dt = annualDateFromRow(r); // ใช้ตัวเดียวกับตอน render
+
+  const key = `${name}|${dt}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+
   // เรียงจาก วดป ใหม่ → เก่า
   rows.sort((a, b) => {
     const da = anyToDate(
@@ -2854,7 +2877,6 @@ function renderAnnual(){
   });
 
   const html = rows.map(r => {
-    // วดป จาก Timestamp (หรือ field ที่เกี่ยวข้อง)
     const dt = annualDateFromRow(r);
 
     // ชื่อแบบสอบถาม จาก FORM_TITLES.Title หรือ field ใกล้เคียง
@@ -2864,12 +2886,12 @@ function renderAnnual(){
       r.FormName   ?? r.formName   ??
       r.name       ?? '-';
 
-    // แต้ม จาก TotalPoints เป็นหลัก ตามที่ต้องการ
+  // ⭐ FIX: ใช้แต้มของแบบสอบถามนั้นเป็นหลัก
     const pts = fmt(
       Number(
-        r.TotalPoints ?? r.totalPoints ??
-        r.Points      ?? r.points      ??
-        r.Score       ?? r.score       ?? 0
+        r.Points ?? r.points ??
+        r.Score  ?? r.score  ??
+        r.TotalPoints ?? r.totalPoints ?? 0
       ) || 0
     );
 
