@@ -108,13 +108,34 @@ th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left }
 
 /* ========== Modals & toast ========== */
 #qrModal,#actModal,#chooseModal{
-  position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-  background:rgba(0,0,0,.5); z-index:60;
+  position:fixed;
+  inset:0;
+  display:none;
+
+  /* 🔥 เปลี่ยนจาก center → start เพื่อให้กล่องลอยลง */
+  align-items:flex-start;
+  justify-content:center;
+
+  /* 🔥 เว้นระยะจาก header */
+  padding-top: calc(var(--header-h) + 16px);
+
+  background:rgba(0,0,0,.5);
+  z-index:60;
 }
+
 #qrBox,#actBox,#chooseBox{
-  background:#fff; border:1px solid var(--line); border-radius:12px;
-  padding:16px; max-width:640px; width:92vw;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px;
+  max-width:640px;
+  width:92vw;
+
+  /* ⭐ กันกล่องล้นจอ + ให้เลื่อนได้ */
+  max-height: calc(100vh - var(--header-h) - 32px);
+  overflow:auto;
 }
+
 .timer{ font-variant-numeric:tabular-nums; font-size:22px }
 .pill2{ display:inline-block; background:#fff7e6; border:1px solid #ffd18a; color:#8a5300; border-radius:999px; padding:4px 10px }
 .bad{ color:var(--danger) } .ok{ color:var(--ok) }
@@ -333,7 +354,6 @@ body.is-login main{
 }
 
 /* ========== ปรับปุ่มกิจกรรมวันนี้ให้เล็กลงและอยู่ในแถวเดียวสวยงาม ========== */
-
 .act-actions{
   display:flex;
   gap:8px;
@@ -405,6 +425,62 @@ body.is-login main{
 /* แต้มที่ได้รับให้เป็นตัวปกติ */
 .pts {
   font-weight:400 !important;
+}
+
+/* ===== Question Image (Activity) ===== */
+.q-img-wrap{
+  margin:8px 0;
+  text-align:center;
+}
+.q-img{
+  max-width:100%;
+  height:auto;
+  max-height:min(38vh, 320px);   /* จำกัดความสูงรูป */
+  object-fit:contain;
+  border-radius:14px;
+
+  cursor:default;        /* ✅ ไม่ให้เหมือนกดขยาย */
+  pointer-events:none;   /* ✅ กันคลิก 100% */
+
+  box-shadow:0 6px 18px rgba(0,0,0,.2);
+}
+
+@media (max-width:520px){
+  .q-img{ max-height:32vh; }  /* มือถือเตี้ยลงอีก */
+}
+
+/* ===== Lightbox ===== */
+.img-lightbox{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+.img-lightbox img{
+  max-width:95vw;
+  max-height:95vh;
+  border-radius:16px;
+}
+
+/* ===== PATCH: Rewards Image Bigger ===== */
+.reward img{
+  width:96px;
+  height:96px;
+  object-fit:cover;
+  border-radius:14px;
+  cursor:zoom-in;
+  border:1px solid #e3e8f0;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+}
+
+@media(min-width:768px){
+  .reward img{
+    width:120px;
+    height:120px;
+  }
 }
 
 </style>
@@ -516,7 +592,7 @@ body.is-login main{
   <section id="annualBox" class="card" style="display:none">
     <h3>🗓️ รายงานทำแบบสอบถามประจำปี</h3>
     <table>
-      <thead><tr><th>วดป</th><th>ชื่อแบบสอบถาม</th><th>แต้ม (รวม)</th></tr></thead>
+      <thead><tr><th>วดป</th><th>ชื่อแบบสอบถาม</th><th>แต้ม</th></tr></thead>
       <tbody id="annual"><tr><td colspan="3" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
@@ -587,8 +663,8 @@ body.is-login main{
 
 <div id="toast" class="toast"></div>
 
-<footer style="text-align:center;color:#8b94b2;font-size:12px;margin:8px 0">
-  © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล | Version 1.0
+<footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
+  © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล | Version 1.1 by Zuree.Yoo
 
 </footer>
 
@@ -621,14 +697,24 @@ async function postSubmissionToSheet(payload) {
   /* ⭐⭐⭐ (H1) กันตอบซ้ำฝั่ง client – วางตรงนี้ ⭐⭐⭐ */
   const today = todayKey('Asia/Bangkok');
   const SAP = localStorage.getItem('SAP') || state.sap;
-  const k = `ans:${today}:${SAP}:${payload.actId}`;
+  // ⭐ PATCH: กันกดซ้ำแบบ "ปลอดภัย" (กันดับเบิลคลิก แต่ไม่ล็อกถ้าส่งไม่สำเร็จ)
+  const finalKey = `ans:${today}:${SAP}:${payload.actId}`;          // ส่งสำเร็จแล้ว
+  const pendKey  = `ans_pending:${today}:${SAP}:${payload.actId}`;  // กำลังส่งอยู่
 
-  if(localStorage.getItem(k)){
+  if(localStorage.getItem(finalKey)){
      toast("วันนี้คุณตอบกิจกรรมนี้แล้ว");
      return {ok:false, error:"already_answered_today"};
   }
- 
-  localStorage.setItem(k,"1");  // ตั้ง flag กันกดซ้ำทันที
+
+  // กันคลิกซ้ำระหว่างรอ network
+  if(localStorage.getItem(pendKey)){
+     toast("กำลังส่งคำตอบ...");
+     return {ok:false, error:"sending"};
+  }
+
+  // ตั้ง pending เพื่อกันคลิกซ้ำทันที (ถ้าส่งไม่สำเร็จจะลบออกด้านล่าง)
+  localStorage.setItem(pendKey, String(Date.now()));
+
 
   try {
     const res = await fetch(url, {
@@ -682,6 +768,7 @@ async function postSubmissionToSheet(payload) {
       if (typeof toast === 'function') {
         toast('บัญชีของคุณอยู่ในสถานะ <b>Non-active</b><br>ติดต่อผู้ดูแลระบบ', 4000);
       }
+      localStorage.removeItem(pendKey);
       return { ok: false, error: 'USER_NON_ACTIVE' };
     }
 
@@ -695,6 +782,11 @@ if (data && data.ok && data.correct != null && typeof showAnswerResult === 'func
         showAnswerResult(null, 0); // PENDING
     }
 }
+
+startFastPollAfterSubmit(payload.actId);
+
+// ส่งต่อผลลัพธ์
+return data;
 
 /* -----------------------------------------------------
    ⭐ แสดงกล่องกิจกรรมวันนี้ทันที ไม่ต้อง Refresh
@@ -738,36 +830,6 @@ try {
     console.warn("Update score UI failed:", err);
 }
 
-/* ⭐⭐⭐ (H3) อัปเดต KPI หน้าเว็บทันที ⭐⭐⭐ */
-try{
-    state.user.PointsEarned += Number(data.points||0);
-    state.user.PointsTotal  = state.user.PointsEarned - state.user.PointsUsed;
-    if(typeof renderKPI === "function") renderKPI();   // คะแนนบนหัวหน้าเว็บจะกระเด้งทันที
-}catch(e){}
-
-/* ⭐ อัปเดตกล่องกิจกรรมวันนี้ทันที (ไม่ต้องรีเฟรช) ⭐ */
-try{
-    addOrUpdateWeekly({
-        dateISO: todayKey(),
-        actId: payload.actId,
-        userAnswer: payload.answer,
-        result: data.correct === 'TRUE',
-        points: Number(data.points||0),
-        bonus: Number(data.bonus||0)
-    });
-
-    // รีเฟรชกล่อง activity โดยใช้ weeklyLocal เหมือน Weekly Report
-    const weeklyLocal = loadWeekly().filter(r => isToday(r.dateISO || r.ts));
-    if(weeklyLocal.length>0){
-        renderLatest(weeklyLocal);
-    }
-
-    // เปลี่ยนตัวเลขคะแนนที่แสดงในกล่อง activity ให้ตรงทันที
-    const ptsEl = document.querySelector("#actLatest .pts");
-    if(ptsEl) ptsEl.textContent = Number(data.points||0);
-
-}catch(e){ console.log("Instant Activity Update Failed",e); }
-
     /* ============================================================
    ⭐ ใส่โค้ดนี้ตรงนี้พอดี — ล็อก Clinic/Non-clinic ทันทีหลังตอบ
    ============================================================ */
@@ -780,24 +842,19 @@ try{
     } catch (_) {}
 
     // ส่งต่อผลลัพธ์ให้ผู้เรียกใช้งาน
+    localStorage.removeItem(pendKey);
     if (data) return data;
 
     // fallback เผื่อ body ว่าง
+    localStorage.removeItem(pendKey);
     return { ok: true, correct: 'PENDING', points: null };
 
   } catch (e) {
     console.error('Submit error:', e);
+    try{ localStorage.removeItem(pendKey); }catch(_){ }
     return { ok: false, error: String(e) };
   }
 }
-
-// ⭐ อัปเดตกิจกรรมล่าสุดทันทีหลังส่ง
-setTimeout(() => {
-  if(typeof renderLatest==="function"){
-      const weeklyLocal = loadWeekly().filter(r => isToday(r.dateISO||r.ts));
-      renderLatest(weeklyLocal);   // ไม่ต้อง refresh แล้ว
-  }
-},200);
 
 // แปลงค่า Status จากชีทให้เป็น boolean
 function isActiveStatus(val){
@@ -833,6 +890,59 @@ const pad2 = n => String(n).padStart(2,'0');
 function toast(html,ms=3000){ const el=$('#toast'); el.innerHTML=html; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),ms); }
 function setWelcome(name){const el=$('#welcomeText'); if(name){ el.textContent='ยินดีต้อนรับคุณ '+name; el.style.display='block'; } else { el.style.display='none'; } }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function parseQuestion(q){
+  if(!q) return { text:'', img:'' };
+
+  const s = String(q).trim();
+  const imgMatch = s.match(/\[IMG\]([\s\S]*?)\[\/IMG\]/i);
+
+  if(imgMatch){
+    return {
+      img: fixImg(imgMatch[1].trim()),
+      text: s.replace(imgMatch[0], '').trim()
+    };
+  }
+
+  // กรณีเป็น URL รูปล้วน
+  if(/^https?:\/\/.+\.(png|jpg|jpeg|gif|webp)$/i.test(s) || s.includes('drive.google.com')){
+    return { img: fixImg(s), text:'' };
+  }
+
+  return { text:s, img:'' };
+}
+
+function renderQuestionHTML(q){
+  const { text, img } = parseQuestion(q);
+  let html = '';
+
+  if (img) {
+    const full = fixImg(img);              // จะได้เป็น uc?export=download&id=...
+    const id   = extractId(img);
+    const thumb = driveThumb(id);          // fallback ถ้า full โหลดไม่ได้
+
+    html += `
+      <div class="q-img-wrap">
+        <img
+          src="${full}"
+          class="q-img"
+          loading="lazy"
+          decoding="async"
+          referrerpolicy="no-referrer"
+          data-full="${full}"
+          data-thumb="${thumb}"
+          onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; }"
+          alt="question image"
+        >
+      </div>`;
+  }
+
+  if (text) {
+    html += `<div class="q-text">${escapeHtml(text)}</div>`;
+  }
+
+  return html || '<div class="muted">—</div>';
+}
+
 // ใช้คีย์วันที่ตามโซนเวลาไทยเสมอ
 function todayKey(tz = 'Asia/Bangkok') {
   const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -845,7 +955,6 @@ function dayKeyFromDate(d, tz = 'Asia/Bangkok') {
   return fmt.format(d);
 }
 
-// === Date helpers (รับได้ทั้ง ISO, 'YYYY-MM-DD HH:mm:ss', 'DD/MM/YYYY, HH:MM:SS', serial day) ===
 // === Date helpers (รับได้ทั้ง ISO, 'YYYY-MM-DD HH:mm:ss', 'DD/MM/YYYY, HH:MM:SS', serial day) ===
 function anyToDate(x){
   if (x instanceof Date) return x;
@@ -924,9 +1033,88 @@ function thaiFromKeys(obj, keys){
 }
 
 // Google Drive image helpers
-function extractId(u){ const s=String(u||""); if(!s) return ""; const m = s.match(/\/d\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/); return m&&m[1]?m[1]:""; }
+function extractId(u){
+  const s = String(u || '').trim();
+  if(!s) return '';
+
+  // รูปแบบหลัก: /file/d/FILE_ID/view
+  let m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+  if (m && m[1]) return m[1];
+
+  // รูปแบบรอง: ?id=FILE_ID
+  m = s.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (m && m[1]) return m[1];
+
+  return '';
+}
+
 function fixImg(u){ const s=String(u||'').trim(); if(!s) return ''; if(/uc\?export=view&id=/.test(s)) return s; const id=extractId(s); return id ? `https://drive.google.com/uc?export=view&id=${id}` : s; }
 function driveThumb(id){ return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w300` : ''; }
+// ===== FAST POLL < 20s after submit =====
+let __fastPollTimer = null;
+
+function startFastPollAfterSubmit(actId){
+  // กันซ้อน
+  if (__fastPollTimer) { clearInterval(__fastPollTimer); __fastPollTimer = null; }
+
+  const start = Date.now();
+  const MAX_MS = 20000;     // < 20 วินาที
+  const EVERY = 2000;       // ทุก 2 วินาที (ปรับเป็น 1500 ได้ถ้าต้องการ)
+
+  // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
+  function isLatestUpdated(){
+    const box = document.querySelector('#actLatest');
+    if (!box) return false;
+    const txt = box.textContent || '';
+    // มี "เฉลย:" แล้ว + เคสกิจกรรมตรง actId จะชัวร์ขึ้น
+    // (ถ้าคุณมี data-actid ในกล่อง สามารถตรวจแบบนั้นได้ แต่เอาแบบไม่ต้องแก้ renderLatest ก่อน)
+    return txt.includes('เฉลย:') || txt.includes('เฉลย');
+  }
+
+  // ยิงรอบแรกทันที (ไม่รอ 2 วิ)
+  (async () => {
+    try{
+      // บางระบบมี realtime อยู่แล้ว แค่ render ซ้ำก็ขึ้น
+      if (typeof renderLatest === 'function') renderLatest();
+      if (typeof renderKPI === 'function') renderKPI();
+      if (typeof renderPoints === 'function') renderPoints();
+
+      // ถ้ามีฟังก์ชันดึงคะแนน/summary จาก Firebase/GAS ให้เรียกด้วย
+      if (typeof refreshUserSummary === 'function') await refreshUserSummary();
+      if (typeof pullUserSummary === 'function') await pullUserSummary();
+    }catch(_){}
+  })();
+
+  __fastPollTimer = setInterval(async () => {
+    const elapsed = Date.now() - start;
+
+    try{
+      // 1) ขอให้คะแนน/สรุปแต้มรีเฟรช
+      if (typeof refreshUserSummary === 'function') await refreshUserSummary();
+      if (typeof pullUserSummary === 'function') await pullUserSummary();
+
+      // 2) สั่ง render กล่อง “กิจกรรมวันนี้” ใหม่
+      if (typeof renderLatest === 'function') renderLatest();
+      if (typeof renderKPI === 'function') renderKPI();
+      if (typeof renderPoints === 'function') renderPoints();
+
+      // 3) ถ้าขึ้นแล้ว → หยุดทันที
+      if (isLatestUpdated()){
+        clearInterval(__fastPollTimer);
+        __fastPollTimer = null;
+        return;
+      }
+    }catch(_){}
+
+    // 4) ครบเวลา → หยุด
+    if (elapsed >= MAX_MS){
+      clearInterval(__fastPollTimer);
+      __fastPollTimer = null;
+      // ไม่ต้อง toast ก็ได้ แต่ถ้าต้องการแจ้งเบา ๆ:
+      // toast('ระบบกำลังประมวลผล กรุณารอสักครู่');
+    }
+  }, EVERY);
+}
 
 /* ========= Header offset (fixed header space) ========= */
 function applyHeaderOffset(){
@@ -1134,13 +1322,34 @@ if (!ok && rawStatus !== ''){
   }catch(e){ console.error(e); } }, 0);
 };
 
-document.querySelector('#btnLogout').onclick = ()=>{
+
+function isActiveStatusField(x){
+  // true/false, 1/0, active/non-active, ไทย/อังกฤษ
+  if (typeof x === 'boolean') return x;
+  const s = String(x ?? '').trim().toLowerCase();
+  if (!s) return true; // ถ้าไม่ระบุ ถือว่า active
+  if (['false','0','no','off','inactive','non-active','disabled','ปิด','งด','หยุด','ไม่ใช้งาน','ยกเลิก'].includes(s)) return false;
+  if (['true','1','yes','on','active','enabled','เปิด','ใช้งาน'].includes(s)) return true;
+  return true;
+}
+
+function forceLogout(msg){
+  try{ if (msg) toast(msg); }catch(_){}
+  // ปิด modal ที่อาจค้างอยู่
+  ['actModal','chooseModal','qrModal'].forEach(id=>{
+    try{ const el=document.getElementById(id); if(el) el.style.display='none'; }catch(_){}
+  });
+  // ล้าง session
   try{
     localStorage.removeItem('SAP');
     localStorage.removeItem('anes.session.v1');
   }catch(_){}
-  location.reload();
-};
+  // รีโหลดกลับไปหน้า login (กัน browser cache)
+  setTimeout(()=>{ location.reload(true); }, 120);
+}
+
+
+document.querySelector('#btnLogout').onclick = ()=>{ forceLogout('ออกจากระบบ'); };
 
 function showLoginError(msg){
   const el = document.querySelector('#loginMsg');
@@ -1283,8 +1492,14 @@ async function attachRealtime(){
   const FB=await ensureFirebase();
   await preloadAllActivities();
 
-  onValue(ref(FB.db,'public/usersSummary/'+state.sap), s=>{
+  if (state.offUserSummary) { try{ state.offUserSummary(); }catch(_){ } state.offUserSummary=null; }
+  state.offUserSummary = onValue(ref(FB.db,'public/usersSummary/'+state.sap), s=>{
   const v = s.val() || {};
+  // ⭐ Watcher: ถ้า status กลายเป็น non-active ให้เด้งออกทันที
+  const active = isActiveStatusField(v.Status ?? v.status ?? v.Active ?? v.active);
+  state.userActive = !!active;
+  if (!active) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
+
   state.total = Number(v.pointsTotal||v.PointsTotal||0);
 
   ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
@@ -1409,6 +1624,7 @@ function renderRewards(){
     return `
       <div class="reward">
         <img loading="lazy" decoding="async"
+             class="reward-img"
              src="${url || 'https://via.placeholder.com/56?text=%20'}"
              data-thumb="${idForThumb ? driveThumb(idForThumb) : ''}"
              onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; this.dataset.thumb=''; } else { this.src='https://via.placeholder.com/56?text=%20'; }"
@@ -1759,7 +1975,8 @@ async function loadTop20Winners(today, actId){
 
 // ปุ่ม Top 20 ถูกและเร็ว (วันนี้) — ใช้เฉพาะกิจกรรมแบบ "เลือกช้อย"
 $('#btnWinners').onclick = async () => {
-  const today = todayKey();
+  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
+const today = todayKey();
 
   // ดึงกิจกรรมวันนี้ เรียงตามเวลาเริ่ม
   const allActs = getTodayActs()
@@ -1932,7 +2149,8 @@ const rows = winners.map((w, idx) => {
 
 // ปุ่ม "ถูกเลข 2 หลัก" — แสดงชื่อ-นามสกุล
 $('#btnLottoAll').onclick = async () => {
-  const tz        = 'Asia/Bangkok';
+  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
+const tz        = 'Asia/Bangkok';
   const today     = todayKey(tz);
   const now       = new Date();
   const yesterday = dayKeyFromDate(
@@ -2127,19 +2345,33 @@ async function loadLottoCorrectForDate(dayKey){
   return Array.from(winnersMap.values());
 }
 
+
 /* ========= Open activity UI ========= */
 function openActSelector(group){ const box=$('#chooseBody'); box.innerHTML=group.list.map((a,i)=>`<button class="ghost" data-i="${i}" style="flex:1">${escapeHtml(a.Title||('ตัวเลือก '+(i+1)))}</button>`).join(''); box.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{ const i=Number(btn.dataset.i||0); $('#chooseModal').style.display='none'; openAct(group.list[i]); }); $('#btnChooseClose').onclick=()=>$('#chooseModal').style.display='none'; $('#chooseModal').style.display='flex'; }
 
 function openAct(act){
-  const pk = pairKeyOf(act);
+  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
+const pk = pairKeyOf(act);
   if (pk && localStorage.getItem(clinPairStoreKey(pk))) {
     toast('วันนี้คุณตอบกิจกรรม Protocol แล้ว');
     actOpen = false;
     return;
   }
 
-  actOpen=true; const id=act.ActID||act.id||act.actId; const t=String(act.InputType||'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
-  $('#actTitle').textContent=(act.Question||act.Title||''); $('#actQuestion').style.display='none'; $('#actQuestion').textContent=''; $('#actStatus').textContent=''; const box=$('#actOpts');
+  actOpen = true;
+  const id = act.ActID || act.id || act.actId;
+  const t  = String(act.InputType || 'MCQ').toUpperCase().replace(/[^A-Z0-9]/g,'');
+
+  // 🔹 Title = ชื่อกิจกรรม (ไม่ใส่รูป)
+  $('#actTitle').textContent = act.Title || '';
+
+  // 🔹 Question = รูป + คำถาม (จุดเดียว)
+  const q = act.Question || '';
+  $('#actQuestion').innerHTML = renderQuestionHTML(q);
+  $('#actQuestion').style.display = q ? 'block' : 'none';
+
+  $('#actStatus').textContent = '';
+  const box = $('#actOpts');
   
   // ส่วนสร้าง UI Input (คงเดิม)
   if(['NUM2','NUM','NUMBER','NUMERIC'].includes(t)) { box.innerHTML=`<input id="actText" placeholder="กรอกตัวเลข 2 หลัก" maxlength="2" inputmode="numeric" style="width:140px;text-align:center">`; setTimeout(()=>{ const inp=$('#actText'); try{ inp.focus(); }catch{}; inp.addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d]/g,'').slice(0,2)); inp.addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnActSubmit').click(); }); },0); }
@@ -2562,11 +2794,9 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
 
 return `
   <div class="act-item">
-    <div><b class="lbl">คำถาม:</b> ${escapeHtml(qText)}</div>
+    <div><b class="lbl">คำถาม:</b> ${renderQuestionHTML(qText)}</div>
     <div><b class="lbl">คุณตอบ:</b> ${escapeHtml(userAns)} • ${verdict}</div>
-
-   <div><b class="lbl">เฉลย:</b> ${escapeHtml(correctFull)}</div>
-
+    <div><b class="lbl">เฉลย:</b> ${escapeHtml(correctFull)}</div>
     <div><b class="lbl">แต้มที่ได้รับ:</b> 
         <b class="pts">${pts}</b> 
         <span class="bonus" style="color:#0a8c4a;font-weight:600">
@@ -2693,8 +2923,9 @@ function checkActivity(){
   renderActList();
 }
 
-$('#btnActNow').onclick=()=>{
-  const pick0 = pickAct();
+$('#btnActNow').onclick = () => {
+  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
+const pick0 = pickAct();
   if (pick0 && hasAns(pick0.actId)) {
       toast("วันนี้คุณตอบกิจกรรมนี้แล้ว", 3000);
       return;
@@ -2830,6 +3061,10 @@ function annualDateFromRow(row){
   return thaiDate(d_fallback); // thaiDate จะคืนค่า '—' ถ้า d_fallback เป็น null
 }
 
+function getCurrentThaiYear(){
+  return new Date().getFullYear() + 543;
+}
+
 function renderAnnual(){
   const box   = document.querySelector('#annualBox');
   const tbody = document.querySelector('#annual');
@@ -2870,6 +3105,20 @@ rows = rows.filter(r => {
   if (seen.has(key)) return false;
   seen.add(key);
   return true;
+});
+
+// ⭐ FIX: แสดงเฉพาะปีปัจจุบัน (พ.ศ.)
+const currentYearTH = getCurrentThaiYear();
+rows = rows.filter(r => {
+  const d = anyToDate(
+    r.Timestamp   ?? r.timestamp ??
+    r.AwardedAt   ?? r.awardedAt ??
+    r.dateISO     ?? r.dateIso   ??
+    r.date        ?? r.Date      ??
+    r.time        ?? r.Time      ?? null
+  );
+  if (!d) return false;
+  return (d.getFullYear() + 543) === currentYearTH;
 });
 
   // เรียงจาก วดป ใหม่ → เก่า
@@ -3090,7 +3339,31 @@ function updateActNowButton(isAvailable){
   }
 }
 
+/* ===== Reward image lightbox (zoom only rewards) ===== */
+document.addEventListener('click', function(e){
+
+  // 🔍 คลิกที่รูปรางวัลเท่านั้น
+  const img = e.target.closest('img.reward-img');
+  if (img) {
+    const box = document.querySelector('#imgLightbox');
+    const big = document.querySelector('#imgLightboxImg');
+    if (!box || !big) return;
+
+    big.src = img.dataset.full || img.src;
+    box.style.display = 'flex';
+    return;
+  }
+
+  if (e.target.id === 'imgLightbox') {
+    e.target.style.display = 'none';
+  }
+});
+
 </script>
+
+<div id="imgLightbox" class="img-lightbox">
+  <img id="imgLightboxImg" alt="">
+</div>
 
 </body>
 </html>
