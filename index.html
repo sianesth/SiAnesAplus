@@ -542,14 +542,8 @@ body.is-login main{
   <!-- Today / Activities -->
   <section id="actTodayCard" class="card" style="display:none">
     <h3>🍀 กิจกรรมวันนี้</h3>
-    <div id="actLatest" class="latest" style="display:none">
-    <div class="act-item">
-      <div><b class="title"></b></div>
-      <div>คำตอบของคุณ: <span class="userAnswer"></span></div>
-      <div>ผลลัพธ์: <span class="result"></span></div>
-      <div>แต้มที่ได้รับ: <b class="pts">0</b> <span class="bonus"></span></div>
-    </div>
-  </div>
+    <div id="actLatest" class="latest" style="display:none"></div>
+  </section>
 
     <div id="actTodayInfo" class="muted" style="display:none"></div>
     <div class="row activity-buttons" style="margin-top:8px">
@@ -785,12 +779,6 @@ if (data && data.ok && data.correct != null && typeof showAnswerResult === 'func
 
 startFastPollAfterSubmit(payload.actId);
 
-// ส่งต่อผลลัพธ์
-return data;
-
-/* -----------------------------------------------------
-   ⭐ แสดงกล่องกิจกรรมวันนี้ทันที ไม่ต้อง Refresh
------------------------------------------------------ */
 try {
     renderLatest([{
         actId: payload.actId,
@@ -1537,7 +1525,7 @@ onValue(ref(FB.db, 'public/redemptionsByUser/' + state.sap), async s => {
   if (list.length) {
     $('#history').innerHTML = list.map(x => `
       <tr>
-        <td>${escapeHtml(String(x.timestamp||'').replace('T',' ').slice(0,19))}</td>
+        <td>${thaiDate(anyToDate(x.timestamp||''))}</td>
         <td>${escapeHtml(x.rewardName||'')}</td>
         <td style="text-align:center">${fmt(x.points||0)}</td>
         <td>${escapeHtml(x.status||'')}</td>
@@ -1551,7 +1539,7 @@ onValue(ref(FB.db, 'public/redemptionsByUser/' + state.sap), async s => {
       if (v && typeof v === 'object') {
         const row = `
           <tr>
-            <td>${escapeHtml(String((v.timestamp||v.ts||'').replace('T',' ').slice(0,19)))}</td>
+            <td>${thaiDate(anyToDate(v.timestamp||v.ts||''))}</td>
             <td>${escapeHtml(v.rewardName || v.reward || '')}</td>
             <td style="text-align:center">${fmt(Number(v.points||0))}</td>
             <td>${escapeHtml(v.status || 'CONFIRMED')}</td>
@@ -2703,8 +2691,8 @@ const weeklyLocal = loadWeekly().filter(r => {
   const d    = anyToDate(r.dateISO || r.ts);
 
   return cat.includes('LOTTO')
-    ? isYesterday(d)          // ⭐ LOTTO แสดงวันถัดไป 1 วัน
-    : isToday(d);             // ⭐ activity ปกติ แสดงวันนี้
+    ? (isToday(d) || isYesterday(d))   // ⭐ LOTTO แสดง “วันเล่น + วันถัดไป”
+    : isToday(d);
 });
 
 const weeklyRemote = (state.weeklyRemote || []).filter(r => {
@@ -2713,7 +2701,7 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
   const d    = anyToDate(r.dateISO || r.ts || r.dateText);
 
   return cat.includes('LOTTO')
-    ? isYesterday(d)          // ⭐ LOTTO แสดงวันถัดไป 1 วัน
+    ? (isToday(d) || isYesterday(d))   // ⭐ LOTTO แสดง “วันเล่น + วันถัดไป”
     : isToday(d);
 });
 
