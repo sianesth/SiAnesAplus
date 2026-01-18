@@ -25,7 +25,13 @@
 
 /* ========== Reset / layout ========== */
 *{ box-sizing:border-box }
-html,body{ height:100%; margin:0 }
+html,body{
+  height:100%;
+  margin:0;
+  max-width:100%;
+  overflow-x:hidden;  /* กันหน้าจอกว้างเกิน + ไม่ให้เลื่อนซ้าย-ขวา */
+}
+
 body{
   font:15px/1.7 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
   background:var(--bg);
@@ -95,16 +101,28 @@ button[disabled]{ background:#cfd7ff; color:#6570a0; cursor:not-allowed }
   width:56px; height:56px; border-radius:8px; object-fit:cover;
   background:#f4f6fb; border:1px solid var(--line);
 }
+.reward b{
+  display:block;
+  word-break: break-word;     /* ตัดคำตามตัวอักษร */
+  overflow-wrap: anywhere;    /* บังคับตัดแม้ไม่มีช่องว่าง */
+}
 
 /* ========== Tables ========== */
 table{ width:100%; border-collapse:collapse }
-th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left }
+th,td{ border:1px solid var(--line); padding:6px 8px; text-align:left; font-size:12px }
 #annualBox table th:last-child,
 #annualBox table td:last-child{ text-align:center; width:90px }
 #weeklyBox table th:nth-child(3),
 #weeklyBox table td:nth-child(3),
 #weeklyBox table th:nth-child(4),
 #weeklyBox table td:nth-child(4){ text-align:center; width:90px }
+
+@media (max-width:600px){
+  th,td{
+    font-size:12px;
+    padding:6px 6px;
+  }
+}
 
 /* ========== Modals & toast ========== */
 #qrModal,#actModal,#chooseModal{
@@ -135,6 +153,153 @@ th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left }
   max-height: calc(100vh - var(--header-h) - 32px);
   overflow:auto;
 }
+
+/* ========== Generic Modal (for Top20 / Transfer) ========== */
+.modal{
+  position:fixed;
+  inset:0;
+  display:none;              /* show via JS: flex */
+  align-items:flex-start;
+  justify-content:center;
+  padding-top: calc(var(--header-h) + 16px);
+  background: rgba(0,0,0,.5);
+  z-index:80;
+}
+.modal-card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px;
+  max-width:640px;
+  width:92vw;
+  max-height: calc(100vh - var(--header-h) - 32px);
+  overflow:auto;
+  box-shadow:0 10px 26px rgba(0,0,0,.18);
+}
+/* ========= Transfer Modal (โอนแต้ม) ========= */
+.transfer-card{
+  max-width:420px;          /* ✅ กล่องแคบลง */
+  width:90vw;
+  padding:20px 22px 18px;
+  border-radius:22px;
+  background:linear-gradient(145deg,#ffffff,#f4f7ff);
+  box-shadow:0 18px 40px rgba(15,23,42,.28);
+}
+
+.transfer-header{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  margin-bottom:4px;
+}
+
+.transfer-title{
+  font-size:20px;
+  font-weight:800;
+  letter-spacing:.02em;
+  color:#0f1733;
+}
+
+.transfer-sub{
+  font-size:13px;
+  color:#6b78a6;
+  margin:2px 0 14px;
+}
+
+.transfer-group{
+  margin-bottom:12px;
+}
+
+.transfer-label{
+  font-size:13px;
+  font-weight:700;
+  color:#0f1733;
+  margin-bottom:6px;
+}
+
+.transfer-search-wrap{
+  position:relative;
+}
+
+.transfer-input{
+  width:100%;
+  border-radius:12px;
+  border:1px solid #dde3f5;
+  padding:10px 12px;
+  font-size:14px;
+  background:#f8f9ff;
+  outline:none;
+  transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+/* เพิ่มความสูงกล่องจำนวนแต้มให้ดูเต็ม */
+.transfer-input--points{
+  height:44px;
+}
+
+.transfer-input:focus{
+  border-color:#4f46e5;
+  background:#ffffff;
+  box-shadow:0 0 0 1px rgba(79,70,229,.25);
+}
+
+/* ปุ่มด้านล่างให้ไม่ยาวทั้งแถว และจัดมุมมนแบบ pill */
+.transfer-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:14px;
+}
+
+.transfer-actions button{
+  flex:0 0 auto;
+  min-width:120px;
+  padding:9px 18px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:600;
+  border:none;
+}
+
+.btn-transfer-primary{
+  background:#1f6fff;
+  color:#fff;
+}
+
+.btn-transfer-primary:hover{
+  filter:brightness(1.05);
+}
+
+.btn-transfer-secondary{
+  background:#eef2ff;
+  color:#2c3e50;
+}
+
+#transferModal .tr-warn{
+  margin-top:4px;
+}
+
+/* ===== Transfer search dropdown (single field) ===== */
+.tr-list{
+  position:absolute;
+  left:0; right:0;
+  top:calc(100% + 6px);
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow:0 10px 26px rgba(0,0,0,.12);
+  max-height:260px;
+  overflow:auto;
+  z-index:200;
+}
+.tr-item{
+  padding:10px 12px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(230,233,242,.8);
+}
+.tr-item:last-child{ border-bottom:none; }
+.tr-item:hover{ background:#f4f7ff; }
+.tr-item .sub{ display:block; font-size:12px; color:var(--muted); margin-top:2px; }
 
 .timer{ font-variant-numeric:tabular-nums; font-size:22px }
 .pill2{ display:inline-block; background:#fff7e6; border:1px solid #ffd18a; color:#8a5300; border-radius:999px; padding:4px 10px }
@@ -247,6 +412,41 @@ body.is-login{
   margin-left:auto; font-size:13px; padding:6px 10px; border-radius:10px;
   background:#1f6fff; color:#fff; border:none; white-space:nowrap;
   box-shadow:0 4px 12px rgba(31,111,255,.18);
+}
+
+/* ===== KPI actions row: Top20 + Transfer (left aligned, same size) ===== */
+#kpiBox .kpiActions{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  padding-bottom:2px;
+}
+#kpiBox .kpiActionBtn{
+  height:36px;
+  padding:0 14px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:700;
+  border:none;
+  background:#1f6fff;
+  color:#fff;
+  white-space:nowrap;
+  box-shadow:0 4px 12px rgba(31,111,255,.18);
+  min-width:120px;
+}
+#kpiBox .kpiActions #btnTop20,
+#kpiBox .kpiActions #btnTransfer{
+  margin-left:0; /* override old rule */
+}
+
+/* small screens: keep in 1 row, allow swipe if needed */
+@media (max-width:720px){
+  #kpiBox .kpiRow{ flex-wrap:wrap; }
+  #kpiBox .kpiActions{ margin-top:8px; }
 }
 
 /* ========== Responsive ========== */
@@ -483,6 +683,53 @@ body.is-login main{
   }
 }
 
+.tr-help{
+  font-size:14px;
+  font-weight:800;
+  color:#0f1733;
+  margin:6px 0 10px;
+  letter-spacing:.1px;
+}
+
+.tr-label{
+  font-size:13px;
+  font-weight:700;
+  color:#0f1733;
+  margin:4px 0 6px;
+}
+
+.tr-warn{
+  margin-top:6px;
+  font-size:12px;
+  font-weight:800;
+  color:var(--danger);
+}
+
+/* ===== PATCH: Transfer Report align แบบ Weekly ===== */
+#transferCard table th,
+#transferCard table td{
+  border:1px solid var(--line);
+  padding:6px 8px;
+  font-size:12px;
+}
+
+/* วดป + ชื่อ → ชิดซ้าย */
+#transferCard table th:nth-child(1),
+#transferCard table td:nth-child(1),
+#transferCard table th:nth-child(2),
+#transferCard table td:nth-child(2){
+  text-align:left !important;
+}
+
+/* แต้ม + สถานะ → ชิดกลาง */
+#transferCard table th:nth-child(3),
+#transferCard table td:nth-child(3),
+#transferCard table th:nth-child(4),
+#transferCard table td:nth-child(4){
+  text-align:center !important;
+  white-space:nowrap;
+}
+
 </style>
 
 </head>
@@ -517,42 +764,47 @@ body.is-login main{
       </div>
       <div id="loginMsg" class="muted" style="margin-top:8px;min-height:20px"></div>
     </div>
-  </section>
+</section>
 
   <!-- KPI + Top20 -->
   <section id="kpiBox" class="card" style="display:none">
     <h3>📊 แต้มสะสมของคุณ</h3>
     <div class="kpiRow row">
       <div class="kpi is-total">
-      <span class="label">รวมทั้งหมด</span>
-      <span class="value" id="uEarned">0</span>
+        <span class="label">รวมทั้งหมด</span>
+        <span class="value" id="uEarned">0</span>
+      </div>
+      <div class="kpi is-used">
+        <span class="label">ใช้แล้ว/โอนแต้ม</span>
+        <span class="value" id="uUsed">0</span>
+      </div>
+      <div class="kpi is-left">
+        <span class="label">คงเหลือ</span>
+        <span class="value" id="uTotal">0</span>
+      </div>
     </div>
-    <div class="kpi is-used">
-      <span class="label">ใช้ไปแล้ว</span>
-      <span class="value" id="uUsed">0</span>
+
+    <div class="kpiActions">
+      <button id="btnTop20" class="kpiActionBtn">🏆 Top 20</button>
+      <button id="btnTransfer" class="kpiActionBtn">🔁 โอนแต้ม</button>
     </div>
-    <div class="kpi is-left">
-      <span class="label">คงเหลือ</span>
-      <span class="value" id="uTotal">0</span>
-    </div>
-    <button id="btnTop20">🏆Top 20</button>
-  </div>
   </section>
 
   <!-- Today / Activities -->
   <section id="actTodayCard" class="card" style="display:none">
     <h3>🍀 กิจกรรมวันนี้</h3>
     <div id="actLatest" class="latest" style="display:none"></div>
-  </section>
-
+  
     <div id="actTodayInfo" class="muted" style="display:none"></div>
+
     <div class="row activity-buttons" style="margin-top:8px">
       <button id="btnActNow">คำถามตอนนี้</button>
       <button id="btnWinners">Top20 Today</button>
       <button id="btnLottoAll">ถูกเลขท้าย</button>
     </div>
+
     <div id="actList" style="margin-top:10px;display:none"></div>
-  </section>
+</section>
 
   <!-- Rewards -->
   <section id="rewardsBox" class="card" style="display:none">
@@ -590,6 +842,22 @@ body.is-login main{
       <tbody id="annual"><tr><td colspan="3" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
+
+  <!-- Transfer Report -->
+  <section class="card" id="transferCard" style="display:none">
+    <h3>🔁 รายงานการโอน/รับโอนแต้ม</h3>
+    <table>
+      <thead>
+         <tr>
+           <th>วดป</th>
+           <th>ชื่อ-นามสกุล</th>
+           <th style="text-align:center">แต้ม</th>
+           <th style="text-align:center">สถานะ</th>
+         </tr>
+       </thead>
+      <tbody id="transferRows"><tr><td colspan="4" style="text-align:center" class="muted">—</td></tr></tbody>
+    </table>
+  </section>
 </main>
 
 <div id="top20Modal" class="modal" style="display:none">
@@ -608,6 +876,126 @@ body.is-login main{
     <button onclick="hideModalTop20()">ปิด</button>
   </div>
 </div>
+
+<!-- Transfer Modal -->
+<div id="transferModal" class="modal" style="display:none">
+  <div class="modal-card transfer-card">
+    <div class="transfer-header">
+      <div class="transfer-title">🔁 โอนแต้ม</div>
+    </div>
+    <!-- ชื่อผู้รับโอน -->
+    <div class="transfer-group">
+      <div class="transfer-label">ชื่อผู้รับโอน</div>
+      <div class="transfer-search-wrap">
+        <input id="trSearch"
+               class="transfer-input"
+               placeholder="พิมพ์ชื่อเพื่อค้นหา"
+               autocomplete="off" />
+        <div id="trList" class="tr-list" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- จำนวนแต้มที่โอน -->
+    <div class="transfer-group">
+      <div class="transfer-label">จำนวนแต้มที่โอน</div>
+
+      <input id="trPoints"
+             class="transfer-input transfer-input--points"
+             type="number"
+             inputmode="numeric"
+             min="1"
+             step="1"
+             placeholder="เช่น 10" />
+
+      <div id="trPtsWarn" class="tr-warn" style="display:none">
+        แต้มไม่พอโอน
+      </div>
+    </div>
+
+    <!-- ปุ่มดำเนินการ -->
+    <div class="transfer-actions">
+      <button id="btnTrCancel"
+              type="button"
+              class="btn-transfer-secondary">
+        ยกเลิก
+      </button>
+      <button id="btnTrNext"
+              type="button"
+              class="btn-transfer-primary">
+        โอนแต้ม
+      </button>
+    </div>
+
+    <!-- กล่องยืนยันการโอน -->
+    <div id="trConfirmBox"
+         style="display:none;margin-top:16px;border:1px solid #e6e9f2;border-radius:16px;padding:12px 12px 10px;background:#fff">
+      <div style="font-size:14px;line-height:1.5">
+        ยืนยันการโอน <b id="trCPoints">0</b> แต้ม ให้ <b id="trCName">-</b>
+      </div>
+      <div class="transfer-actions" style="margin-top:10px">
+        <button id="btnTrBack"
+                type="button"
+                class="btn-transfer-secondary">
+          ย้อนกลับ
+        </button>
+        <button id="btnTrConfirm"
+                type="button"
+                class="btn-transfer-primary"
+                style="background:#0a8c4a">
+          ยืนยัน
+        </button>
+      </div>
+      <div id="trConfirmMsg"
+           class="muted"
+           style="font-size:12px;margin-top:6px"></div>
+    </div>
+
+    <div id="trMsg"
+         class="muted"
+         style="font-size:12px;margin-top:10px"></div>
+  </div>
+</div>
+
+<script>
+  function getPointsLeft(){
+    const el = document.getElementById('uTotal'); // KPI คงเหลือ
+    const v = el ? Number(String(el.textContent||'').replace(/[^\d.-]/g,'')) : 0;
+    return Math.max(0, Math.floor(v||0));
+  }
+
+  const trPointsEl = document.getElementById('trPoints');
+  const trWarnEl   = document.getElementById('trPtsWarn');
+  const trNextBtn  = document.getElementById('btnTrNext');
+
+  if (trPointsEl){
+    trPointsEl.addEventListener('input', () => {
+      const left = getPointsLeft();
+      let v = parseInt(trPointsEl.value || '0', 10);
+
+      // reset
+      if (trWarnEl) trWarnEl.style.display = 'none';
+      if (trNextBtn) trNextBtn.disabled = false;
+
+      if (!v || v < 1) return;
+
+      if (v > left){
+        trPointsEl.value = left > 0 ? String(left) : '';
+        if (trWarnEl) trWarnEl.style.display = 'block';
+        if (trNextBtn) trNextBtn.disabled = true;
+      }
+    });
+  }
+
+  const left = getPointsLeft();
+  const pts  = document.getElementById('trPoints');
+  const warn = document.getElementById('trPtsWarn');
+
+  if (pts){
+    pts.value = '';
+    pts.max = String(left);   // ⭐ จำกัด max ตามแต้มคงเหลือ
+  }
+  if (warn) warn.style.display = 'none';
+</script>
 
 <!-- QR Modal -->
 <div id="qrModal"><div id="qrBox">
@@ -659,7 +1047,7 @@ body.is-login main{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.1 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 1.2 by Zuree.Yoo</span>
 </footer>
 
 <script type="module">
@@ -723,39 +1111,41 @@ async function postSubmissionToSheet(payload) {
     try { data = await res.json(); } catch (_) { data = null; }
 
     // ====== กันตอบซ้ำ (ฝั่ง client) เมื่อเซิร์ฟเวอร์แจ้งว่าตอบไปแล้ว ======
-    if (data && (data.error === 'already_answered_today' || data.errorCode === 'ALREADY_ANSWERED')) {
-      try {
-        const actId = String(payload.actId || '').trim();
-        if (actId) {
-          const today = todayKey('Asia/Bangkok'); // ใช้โซนไทย
-          const SAP   = localStorage.getItem('SAP') || (state && state.sap) || '';
-          const key   = `ans:${today}:${SAP}:${actId}`;
-          localStorage.setItem(key, '1');          // กันซ้ำแบบ ans:YYYY-MM-DD:SAP:ActID
-          try { localStorage.setItem(aKey(actId), '1'); } catch (e) {}
+if (data && (
+     data.error === 'already_answered_today' ||
+     data.errorCode === 'ALREADY_ANSWERED' ||
+     data.error === 'already_answered_protocol_today' ||
+     data.errorCode === 'ALREADY_ANSWERED_PROTOCOL'
+)) {
+  // เซ็ต key กันตอบซ้ำ + lock clinic/non-clinic เหมือนเดิม
+  const actId = String(payload.actId || '').trim();
+  if (actId) {
+    const today = todayKey('Asia/Bangkok');
+    const SAP   = localStorage.getItem('SAP') || (state && state.sap) || '';
+    const key   = `ans:${today}:${SAP}:${actId}`;
+    localStorage.setItem(key, '1');
+    try { localStorage.setItem(aKey(actId), '1'); } catch (e) {}
 
-          // ถ้ามีคู่ clinic/non-clinic ให้ปิดชุดนั้นด้วย
-          try {
-            const meta = (typeof getActMetaById === 'function') ? getActMetaById(actId) : null;
-            const pk = meta && (typeof pairKeyOf === 'function') ? pairKeyOf(meta) : null;
-            if (pk && typeof clinPairStoreKey === 'function') {
-              localStorage.setItem(clinPairStoreKey(pk), '1');
-            }
-          } catch (e) {}
+    try {
+      const meta = (typeof getActMetaById === 'function') ? getActMetaById(actId) : null;
+      const pk = meta && (typeof pairKeyOf === 'function') ? pairKeyOf(meta) : null;
+      if (pk && typeof clinPairStoreKey === 'function') {
+        localStorage.setItem(clinPairStoreKey(pk), '1');
+      }
+    } catch (e) {}
 
-          // ยิงค่าเข้า RTDB เพื่อเสริมความชัวร์
-          try {
-            await fetch(`${DB_URL}/public/answeredToday/${today}/${encodeURIComponent(actId)}/${encodeURIComponent(SAP)}.json`, {
-              method: 'PUT',
-              body: 'true'
-            });
-          } catch (_) {}
-        }
-      } catch (e) {}
+    try {
+      await fetch(`${DB_URL}/public/answeredToday/${today}/${encodeURIComponent(actId)}/${encodeURIComponent(SAP)}.json`, {
+        method: 'PUT',
+        body: 'true'
+      });
+    } catch (_) {}
+  }
 
-      try { document.querySelector('#actModal').style.display = 'none'; } catch (e) {}
-      if (typeof toast === 'function') toast('วันนี้คุณตอบกิจกรรมนี้แล้ว', 3000);
-      return { ok: false, error: 'already_answered_today' };
-    }
+  try { document.querySelector('#actModal').style.display = 'none'; } catch (e) {}
+  if (typeof toast === 'function') toast('วันนี้คุณตอบกิจกรรมนี้แล้ว', 3000);
+  return { ok: false, error: 'already_answered_today' };
+}
 
     // ====== แจ้ง Non-active ======
     if (data && data.error === 'USER_NON_ACTIVE') {
@@ -1556,18 +1946,70 @@ onValue(ref(FB.db, 'public/redemptionsByUser/' + state.sap), async s => {
   onValue(ref(FB.db,'public/leaderboard'), s=>{ state.leader=s.val()||[]; });
   onValue(ref(FB.db,'public/actIndex'), snap=>{ actIndex=snap.val()||{}; renderWeekly(); renderLatest(state.lastSubmission||readLatestCache()); });
 
-  onValue(ref(FB.db,'public/redeemAck/'+state.sap), s=>{
-    const a=s.val(); if(!a) return; const key=`ack:${state.sap}:${a.timestamp||''}:${a.rewardName||''}`; if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); try{$('#qrModal').style.display='none';}catch{}; const dt=(a.timestamp||'').replace('T',' ').slice(0,19); toast(`✅ ได้รับรางวัลแล้ว<br><b>${escapeHtml(a.rewardName||'')}</b><br>${escapeHtml(dt)} • โดย ${escapeHtml(a.admin||'admin')}`,4500); $('#qrAck').textContent=`แลก "${a.rewardName}" สำเร็จ ✓ โดย ${a.admin||'admin'}`; clearLock(); applyBanner(); renderRewards();
-  });
+// 🔔 Redeem ACK จาก Admin (กัน error ฝั่ง user)
+onValue(
+  ref(FB.db, 'public/redeemAck/' + state.sap),
+  s => {
+    try {
+      const a = s.val();
+      if (!a || a.ok === false) return;
 
-  preloadAllActivities();
-  wireWeeklyRealtime();
-  wireAnnualRealtime();
+      // ts ใน RTDB ใช้ชื่อว่า ts ไม่ใช่ timestamp
+      const ts  = String(a.ts || a.timestamp || '');
+      const key = `ack:${state.sap}:${ts}:${a.rewardName || ''}`;
 
-  ensureActivitiesRealtime();
+      // กันไม่ให้เด้งซ้ำ
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+
+      // ปิดหน้าต่าง QR ถ้ามี
+      const modal = $('#qrModal');
+      if (modal) modal.style.display = 'none';
+
+      const dt = ts ? ts.replace('T', ' ').slice(0, 19) : '';
+      const adminName = a.adminName || a.admin || 'admin';
+
+      toast(
+        `✅ ได้รับรางวัลแล้ว<br><b>${escapeHtml(a.rewardName || '')}</b>` +
+        (dt ? `<br>${escapeHtml(dt)} • โดย ${escapeHtml(adminName)}` : ''),
+        4500
+      );
+
+      const ackEl = $('#qrAck');
+      if (ackEl) {
+        ackEl.textContent = `แลก "${a.rewardName || ''}" สำเร็จ ✓ โดย ${adminName}`;
+      }
+
+      clearLock();
+      applyBanner();
+      renderRewards();
+    } catch (err) {
+      console.error('redeemAck handler error', err);
+    }
+  },
+  err => {
+    console.error('redeemAck realtime error', err);
+  }
+);
+
+preloadAllActivities();
+wireWeeklyRealtime();
+wireAnnualRealtime();
+wireTransfersRealtime();
+ensureActivitiesRealtime();
 }
 
 /* ========= Rewards render ========= */
+// ซ่อน key รางวัลที่น่าจะเป็น URL-encoded (%E0%B8...) จาก bug เดิม
+function isEncodedRewardKey(name){
+  name = String(name || '');
+  if (!name) return false;
+  // กรณีเป็น %xx ยาว ๆ หรือชื่อยาวมากและมี %E0 เยอะ
+  if (/^%(?:[0-9A-Fa-f]{2})+$/.test(name)) return true;
+  if (name.length > 30 && name.includes('%E0')) return true;
+  return false;
+}
+
 function renderRewards(){
   const data = state.rewards || {};
 
@@ -1577,6 +2019,7 @@ function renderRewards(){
 
   // สร้างอาร์เรย์แล้วเรียง: แต้มต้องใช้มาก → น้อย (tie-break ตามชื่อ/สต็อก)
   const list = Object.entries(data)
+    .filter(([name]) => !isEncodedRewardKey(name))   // ⬅️ กรอง key แปลก ๆ ทิ้ง
     .map(([name, v]) => ({
       name,
       v,
@@ -1644,6 +2087,303 @@ async function loadUsersMap(){
     return map;
 }
 
+
+/* ========= Transfers (realtime + UI) ========= */
+function renderTransfers(){
+  const tb = document.querySelector('#transferRows');
+  const card = document.querySelector('#transferCard');
+  if(!tb || !card) return;
+
+  const data = state.transfers || null;
+  const arr = [];
+
+  const me = String(state.sap||'').trim();
+
+  if (data && typeof data === 'object'){
+    Object.keys(data).forEach(k=>{
+      const x = data[k] || {};
+      const ts = x.ts || x.time || x.Timestamp || x.dateISO || '';
+      const d  = ts ? new Date(ts) : null;
+      const ms = d && !isNaN(d.getTime()) ? d.getTime() : 0;
+
+      const fromSap  = String(x.fromSap||x.FromSAP||'').trim();
+      const toSap    = String(x.toSap||x.ToSAP||'').trim();
+      const fromName = String(x.fromName||x.FromName||'').trim();
+      const toName   = String(x.toName||x.ToName||'').trim();
+      const pts      = Number(x.points||x.Points||0)||0;
+
+      // มุมมองของ user ปัจจุบัน
+      const isOut = (fromSap && me && fromSap === me);  // user เป็นผู้โอน?
+      const otherName = isOut ? (toName || toSap || '-') : (fromName || fromSap || '-');
+
+      // ✅ ตามหลักการใหม่
+      const statusText = isOut ? 'โอนแต้ม' : 'รับแต้ม';
+      const signPts    = isOut ? -Math.abs(pts) : Math.abs(pts);
+      const cls        = isOut ? 'bad' : 'ok';          // bad=แดง, ok=เขียว
+
+      arr.push({ ms, ts, otherName, signPts, statusText, cls });
+    });
+  }
+
+  arr.sort((a,b)=>b.ms-a.ms);
+
+  if(!arr.length){
+    tb.innerHTML = '<tr><td colspan="4" style="text-align:center" class="muted">—</td></tr>';
+    card.style.display = 'block';
+    return;
+  }
+
+  const fmt = (ts)=>{
+    try{
+      const d=new Date(ts);
+      if(isNaN(d.getTime())) return '-';
+      // ✅ แนะนำให้ใช้เฉพาะวัน-เดือน-ปี (เหมือนตารางอื่น) ถ้าอยากเอาเวลาออก
+      return d.toLocaleDateString('th-TH', {
+        timeZone:'Asia/Bangkok',
+        year:'numeric', month:'2-digit', day:'2-digit'
+      });
+    }catch(_){ return '-'; }
+  };
+
+  tb.innerHTML = arr.map(r=>{
+    const ptsTxt = `${r.signPts>0?'+':''}${r.signPts}`;
+    return `
+      <tr>
+        <td style="text-align:center">${escapeHtml(fmt(r.ts))}</td>
+        <td>${escapeHtml(r.otherName)}</td>
+        <td class="${r.cls}" style="text-align:center;font-weight:800">${ptsTxt}</td>
+        <td class="${r.cls}" style="text-align:center;font-weight:800">${r.statusText}</td>
+      </tr>
+    `;
+  }).join('');
+
+  card.style.display = 'block';
+}
+
+async function wireTransfersRealtime(){
+  const FB=await ensureFirebase();
+  if (state.offTransfers) { try{ state.offTransfers(); }catch(_){ } state.offTransfers=null; }
+  const p = `public/transfersByUser/${encodeURIComponent(state.sap)}`;
+  state.offTransfers = onValue(ref(FB.db,p), snap=>{
+    state.transfers = snap.val() || null;
+    renderTransfers();
+  }, _err=>{
+    // ถ้าไม่มี path ก็ยังอยากให้แสดงการ์ดว่างไว้
+    state.transfers = null;
+    renderTransfers();
+  });
+}
+
+/* ========= Transfer Modal ========= */
+let __trSelected = null;
+
+function showTransferModal(){
+  __trSelected = null;
+
+  // reset form
+  $('#trSearch').value = '';
+  $('#trPoints').value = '';
+  try{ const box=$('#trList'); if(box){ box.innerHTML=''; box.style.display='none'; } }catch(e){}
+  $('#trMsg').textContent = '';
+  $('#trConfirmMsg').textContent = '';
+
+  // show form step, hide confirm step
+  const form = $('#trFormBox');
+  if(form) form.style.display = 'block';
+  $('#trConfirmBox').style.display = 'none';
+
+  // enable confirm button in case it was disabled
+  try { $('#btnTrConfirm').disabled = false; } catch(e){}
+
+  document.querySelector('#transferModal').style.display='flex';
+  setTimeout(()=>$('#trSearch').focus(), 10);
+}
+function hideTransferModal(){
+  document.querySelector('#transferModal').style.display='none';
+}
+
+// expose for inline handlers (safety)
+window.showTransferModal = showTransferModal;
+window.hideTransferModal = hideTransferModal;
+
+// Close handlers for transfer modal
+try{
+  const m = document.querySelector('#transferModal');
+  if(m){
+    m.addEventListener('click', (e)=>{
+      if(e.target === m) hideTransferModal(); // click on overlay
+    });
+  }
+  const c = document.querySelector('#btnTrCancel');
+  if(c) c.addEventListener('click', ()=> hideTransferModal());
+}catch(e){}
+
+
+
+async function searchUsersByName(q){
+  q = String(q||'').trim();
+  if(q.length < 1) return [];
+  const r = await gasJSONP({ act:'searchusers', q, limit:15 }, 1800);
+  if(!r || r.ok!==true) return [];
+  return Array.isArray(r.items) ? r.items : [];
+}
+
+let __trSearchTimer = null;
+
+function setPickLabel_(txt){
+  const el = document.querySelector('#trPickLabel');
+  if(!el) return;
+  el.textContent = txt;
+}
+
+function renderTrList_(items){
+  const box = document.querySelector('#trList');
+  if(!box) return;
+  box.innerHTML = '';
+  const arr = Array.isArray(items) ? items : [];
+  if(!arr.length){
+    box.style.display = 'none';
+    return;
+  }
+  for(const it of arr){
+    const sap  = String(it.sap||'').trim();
+    const name = String(it.name||'').trim();
+    if(!sap || !name) continue;
+
+    const div = document.createElement('div');
+    div.className = 'tr-item';
+    div.textContent = name;
+    div.addEventListener('click', ()=>{
+      __trSelected = { sap, name };
+      const inp = document.querySelector('#trSearch');
+      if(inp) inp.value = name;
+      setPickLabel_(`ผู้รับโอน: ${name} (SAP ${sap})`);
+      box.style.display = 'none';
+      box.innerHTML = '';
+    });
+    box.appendChild(div);
+  }
+  box.style.display = 'block';
+}
+
+function wireTransferSearch_(){
+  const inp = document.querySelector('#trSearch');
+  const box = document.querySelector('#trList');
+  if(!inp || !box) return;
+
+  // input handler (debounce)
+  inp.addEventListener('input', ()=>{
+    const q = String(inp.value||'').trim();
+    __trSelected = null;
+    setPickLabel_('ยังไม่ได้เลือกผู้รับโอน');
+    box.style.display = 'none';
+    box.innerHTML = '';
+
+    clearTimeout(__trSearchTimer);
+    __trSearchTimer = setTimeout(async ()=>{
+      const qq = String(inp.value||'').trim();
+      if(!qq){ box.style.display='none'; box.innerHTML=''; return; }
+      const items = await searchUsersByName(qq);
+      renderTrList_(items);
+    }, 200);
+  });
+
+  // close dropdown when click outside
+  document.addEventListener('click', (e)=>{
+    const modal = document.querySelector('#transferModal');
+    if(!modal || modal.style.display==='none') return;
+
+    const inside = modal.contains(e.target);
+    if(!inside) return; // modal itself handles outside click close
+    const isInInput = inp.contains(e.target) || box.contains(e.target);
+    if(!isInInput){
+      box.style.display = 'none';
+    }
+  });
+}
+
+// call once
+try{ wireTransferSearch_(); }catch(e){}
+$('#btnTrNext').onclick = async ()=>{
+  const meSap = String(state.sap||'').trim();
+  const pts = parseInt($('#trPoints').value, 10) || 0;
+  const pick = __trSelected;
+
+  if(!pick || !pick.sap || !pick.name){
+    toast('กรุณาเลือกชื่อผู้รับโอนจากรายการ');
+    return;
+  }
+  if(pick.sap === meSap){
+    toast('ไม่สามารถโอนให้ตัวเองได้');
+    return;
+  }
+  if(!pts || pts<=0){
+    toast('กรุณาระบุจำนวนแต้ม');
+    return;
+  }
+
+  // โชว์ confirm
+  $('#trCName').textContent = pick.name;
+  $('#trCPoints').textContent = String(pts);
+  $('#trConfirmBox').style.display = 'block';
+  const form = $('#trFormBox');
+  if(form) form.style.display = 'none';
+  $('#trMsg').textContent = '';
+};
+
+$('#btnTrBack').onclick = ()=>{
+  $('#trConfirmBox').style.display='none';
+  const form = $('#trFormBox');
+  if(form) form.style.display = 'block';
+  $('#trConfirmMsg').textContent='';
+};
+
+$('#btnTrConfirm').onclick = async ()=>{
+  const btn = $('#btnTrConfirm');
+  const meSap = String(state.sap||'').trim();
+  const pts = parseInt($('#trPoints').value, 10) || 0;
+  const pick = __trSelected;
+
+  if(!pick || !pick.sap || !pts) return;
+
+  btn.disabled = true;
+  $('#trConfirmMsg').textContent = 'กำลังโอนแต้ม...';
+
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method:'POST',
+      body: JSON.stringify({
+        action:'transfer:points',
+        fromSap: meSap,
+        fromName: state.name || '',
+        toSap: pick.sap,
+        toName: pick.name,
+        points: pts
+      }),
+      cache:'no-store'
+    });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+
+    if(!data || data.ok!==true){
+      const msg = (data && (data.message||data.error)) ? (data.message||data.error) : 'โอนแต้มไม่สำเร็จ';
+      $('#trConfirmMsg').textContent = msg;
+      toast(msg);
+      btn.disabled = false;
+      return;
+    }
+
+    toast('โอนแต้มสำเร็จ');
+    $('#trConfirmMsg').textContent = 'สำเร็จ ✅';
+    setTimeout(()=>hideTransferModal(), 600);
+
+  }catch(err){
+    $('#trConfirmMsg').textContent = 'โอนแต้มไม่สำเร็จ (network)';
+    toast('โอนแต้มไม่สำเร็จ');
+  }finally{
+    btn.disabled = false;
+  }
+};
+
 /* ========= Top 20 (dialog) ========= */
 $('#btnTop20').onclick = async () => {
   try {
@@ -1699,6 +2439,17 @@ $('#btnTop20').onclick = async () => {
     $('#dlgTop').showModal();
   }
 };
+// ===== Transfer button (open modal) =====
+try{
+  const bt = $('#btnTransfer');
+  if(bt){
+    bt.onclick = ()=>{
+      if(!state || !state.sap){ toast('กรุณาเข้าสู่ระบบก่อน'); return; }
+      try{ showTransferModal(); }catch(e){ console.warn(e); }
+    };
+  }
+}catch(e){}
+
 
 /* ========= Activities realtime ========= */
 let actOpen=false, _autoTimer=null;
@@ -2548,6 +3299,19 @@ const pk = pairKeyOf(act);
           return;
         }
 
+        // ⭐ กรณีระบบบอกว่าตอบวันนี้แล้ว (ทั้งแบบ act เดิม และ protocol group)
+        if (res && (
+             res.error === 'already_answered_today' ||
+             res.errorCode === 'ALREADY_ANSWERED' ||
+             res.error === 'already_answered_protocol_today' ||
+             res.errorCode === 'ALREADY_ANSWERED_PROTOCOL'
+        )) {
+          success = true;               // กันไม่ให้ไป rollback ธงใน localStorage
+          $('#btnActNow').disabled = true;
+          checkActivity();              // refresh กล่องกิจกรรม
+          return;
+        }
+
         if (res && res.ok) {
           success = true;
 
@@ -2660,6 +3424,43 @@ function isAnsweredToday(actId){
   return weekly.some(r => String(r.actId) === String(actId));
 }
 
+function renderAnswerHTML(raw){
+  var s = String(raw || '').trim();
+  if (!s) return '-';
+
+  // ดึงรูปถ้ามี
+  var imgHtml = '';
+  var m = s.match(/\[IMG\]([\s\S]+?)\[\/IMG\]/i);
+
+  if (m) {
+    var urlRaw = (m[1] || '').trim();
+    s = s.replace(m[0], '').trim();
+
+    if (urlRaw) {
+      var id = extractId(urlRaw);
+      if (id) {
+        var full = fixImg(urlRaw);
+        var thumb = driveThumb(id);
+
+        imgHtml =
+          '<div class="q-img-wrap">' +
+            '<img ' +
+              'src="' + full + '" ' +
+              'class="q-img" ' +
+              'loading="lazy" ' +
+              'decoding="async" ' +
+              'referrerpolicy="no-referrer" ' +
+              (thumb ? 'data-thumb="' + thumb + '" ' : '') +
+              'onerror="this.onerror=null; if(this.dataset.thumb){ this.src=this.dataset.thumb; }" ' +
+              'alt="เฉลย">' +
+          '</div>';
+      }
+    }
+  }
+
+  return '<span>' + escapeHtml(s || '-') + '</span>' + imgHtml;
+}
+
 function showAnswerInstant(question, yourAnswer, correctAnswer, isCorrect, points){
     const box = document.querySelector("#actLatest");
     if(!box) return;
@@ -2672,7 +3473,7 @@ function showAnswerInstant(question, yourAnswer, correctAnswer, isCorrect, point
                     padding:12px;margin-bottom:10px;font-size:15px;line-height:1.45;">
             <div><b>คำถาม:</b> ${question}</div>
             <div><b>คุณตอบ:</b> ${yourAnswer} • <b style="color:${color}">${status}</b></div>
-            <div><b>เฉลย:</b> ${correctAnswer||"-"}</div>
+            <div><b>เฉลย:</b> ${renderAnswerHTML(correctAnswer)}</div>
             <div><b>แต้ม:</b> ${points}</div>
         </div>
     `;
@@ -2763,13 +3564,25 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
     const bonus = Number(w.bonus || act.BonusPoints || 0);
 
     // --- เฉลย ---
-    const ansKey = String(act.Answer || '').trim().toUpperCase();
-    const optMap = { A: act.OptionA, B: act.OptionB, C: act.OptionC, D: act.OptionD };
-    let correctFull = ansKey;
+    // ใช้ข้อความจากคอลัมน์ Answer โดยตรง (รองรับ [IMG]...[/IMG])
+    // และถ้า Answer มีแค่ตัวเลือก (เช่น "B" หรือ "ก.") ค่อยดึงข้อความจาก OptionA–D มาเติม
+    const ansRaw = String(act.Answer || '').trim();
+    const optMap = { A: act.OptionA, B: act.OptionB, C: act.OptionC, D: act.OptionD,
+                     'ก': act.OptionA, 'ข': act.OptionB, 'ค': act.OptionC, 'ง': act.OptionD };
 
-    if (['A','B','C','D'].includes(ansKey)) {
-      const t = optMap[ansKey];
-      correctFull = t ? `${ansKey}. ${t}` : ansKey;
+    let correctFull = ansRaw;
+
+    // ถ้า Answer เริ่มด้วยตัวเลือก (A/B/C/D/ก/ข/ค/ง) ตามด้วยจุด/วงเล็บ แล้วค่อยตามด้วยข้อความ/รูป
+    const mAns = ansRaw.match(/^([A-Dก-ง])([\.\\)])?\s*(.*)$/i);
+    if (mAns) {
+      const letter = mAns[1].toUpperCase();
+      const tail   = mAns[3] || '';
+      const fromOpt = optMap[letter] || '';
+
+      // ถ้าใน Answer มีข้อความตามหลังตัวเลือกอยู่แล้ว → ใช้อันนั้น (อาจมี [IMG])
+      // ถ้าไม่มีข้อความเลย → ดึงจาก Option ตามตัวเลือก
+      const body = tail.trim() || String(fromOpt || '').trim();
+      correctFull = body ? `${letter}. ${body}` : letter;
     }
 
     let verdict = '';
@@ -2784,7 +3597,7 @@ return `
   <div class="act-item">
     <div><b class="lbl">คำถาม:</b> ${renderQuestionHTML(qText)}</div>
     <div><b class="lbl">คุณตอบ:</b> ${escapeHtml(userAns)} • ${verdict}</div>
-    <div><b class="lbl">เฉลย:</b> ${escapeHtml(correctFull)}</div>
+    <div><b class="lbl">เฉลย:</b> ${renderAnswerHTML(correctFull)}</div>
     <div><b class="lbl">แต้มที่ได้รับ:</b> 
         <b class="pts">${pts}</b> 
         <span class="bonus" style="color:#0a8c4a;font-weight:600">
