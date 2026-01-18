@@ -1828,7 +1828,9 @@ function isTodayLocal(str){ const t=parseLocal(str); if(Number.isNaN(t)) return 
 function hasAns(id){
   if(!id) return false;
 
-  // --- กันตอบซ้ำระหว่าง Protocol & Non-Protocol ---  
+  // ================================
+  // 1) กันตอบซ้ำจากกลุ่ม Protocol เดิม (เครื่องเดียวกัน)
+  // ================================
   const meta = getActMetaById(id);
   const pairKey = meta ? pairKeyOf(meta) : null;
   if (pairKey) {
@@ -1836,14 +1838,44 @@ function hasAns(id){
       if (localStorage.getItem(clinKey)) return true;
   }
 
-  // แบบเดิม
-  if(localStorage.getItem(aKey(id))) return true;
+  // ================================
+  // 2) กันตอบซ้ำจาก localStorage เดิม (เครื่องเดียวกัน)
+  // ================================
+  if (localStorage.getItem(aKey(id))) return true;
 
-  // คีย์รูปแบบ ans:YYYY-MM-DD:SAP:ActID
+  // คีย์แบบ ans:YYYY-MM-DD:SAP:ActID
   const k2 = `ans:${todayKey('Asia/Bangkok')}:${state.sap||''}:${id}`;
-  if(localStorage.getItem(k2)) return true;
+  if (localStorage.getItem(k2)) return true;
 
-  // ส่งไปแล้วในวันนี้ (optimistic)
+  // ================================
+  // 3) กันตอบซ้ำข้ามเครื่องด้วย weeklyRemote (Firebase)
+  // ================================
+  const remoteAll = Array.isArray(state.weeklyRemote) ? state.weeklyRemote : [];
+  if (remoteAll.length){
+      const todayRows = remoteAll.filter(r => {
+          const ts = r.dateISO || r.ts || r.timestamp || r.dateText;
+          return ts && isToday(ts);
+      });
+
+      // 3.1 ถ้าวันนี้เคยตอบ actId นี้แล้ว → ห้ามตอบซ้ำ
+      if (todayRows.some(r => String(r.actId) === String(id))) {
+          return true;
+      }
+
+      // 3.2 ถ้าเป็นกลุ่ม Protocol:
+      //     ถ้าวันนี้เคยตอบกิจกรรมอื่นใน pair เดียวกันแล้ว → ห้ามตอบซ้ำ
+      if (pairKey){
+          const usedPair = todayRows.some(r => {
+              const m2 = getActMetaById(r.actId);
+              return m2 && pairKeyOf(m2) === pairKey;
+          });
+          if (usedPair) return true;
+      }
+  }
+
+  // ================================
+  // 4) fallback: ใช้ lastSubmission ใน state (optimistic)
+  // ================================
   const x = state.lastSubmission;
   if(!x) return false;
   const same = String(x.actId||'') === String(id||'');
@@ -3786,7 +3818,8 @@ function mapWeeklyRow(it){
     it.answerUser   ?? it.AnswerUser   ??
     it.answer       ?? it.Answer       ?? null;
 
-  return { dateText, actId, title, result, points, userAnswer };   // ✅ เพิ่ม userAnswer ออกไป
+    // เพิ่ม dateISO เอาไว้ใช้เช็กว่าวันเดียวกับวันนี้หรือไม่
+  return { dateText, dateISO: dateText, actId, title, result, points, userAnswer };
 }
 
 async function wireWeeklyRealtime(){
