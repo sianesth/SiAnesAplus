@@ -2,6 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="utf-8" />
+<!-- ⭐ ป้องกัน cache HTML -->
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>ANESA+ — Session 1</title>
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
@@ -1889,8 +1893,30 @@ function hasAns(id){
          d.getDate()===n.getDate();
 }
 
-function titleClinType(t){ const s=String(t||'').toLowerCase(); if(/\bnon[-\s]?clinical\b/.test(s) || /(non[-\s]?clinical)/i.test(t)) return 'nonclin'; if(/\bclinic\b/.test(s) || /\bclinical\b/.test(s) || /(clinic)/i.test(t)) return 'clin'; return null; }
-function pairKeyOf(a){ const g=a.GroupId||a.groupId||''; const t=a.Title||a.Question||''; const tag=titleClinType(t); return (g && tag)?String(g):null; }
+function titleClinType(t){
+  const s = String(t || '').toLowerCase();
+  if (!s) return null;
+
+  // ตรวจจับกลุ่ม non-clinical ก่อน (เพื่อไม่ให้คำว่า 'clinic' ภายในคำว่า non-clinic ทับกัน)
+  if (/\bnon[-\s_]*clin/.test(s) || /\bnon[-\s_]*clinic/.test(s)) {
+    return 'nonclin';
+  }
+
+  // clinical / clinic
+  if (/\bclinical\b/.test(s) || /\bclinic\b/.test(s) || /\bclin\b/.test(s)) {
+    return 'clin';
+  }
+
+  return null;
+}
+
+function pairKeyOf(a){
+  if (!a) return null;
+  const g = a.GroupId || a.groupId || '';
+  const t = a.Title || a.Question || '';
+  const tag = titleClinType(t);
+  return (g && tag) ? String(g) : null;
+}
 
 /* ========= Preload activities for titles ========= */
 let _allActsLoaded=false;
@@ -2728,7 +2754,7 @@ async function loadTop20Winners(today, actId){
     const result = [];
 
     for (const it of winners){
-      const sap = String(it.sap || it.SAP || '').trim();
+      const sap = String(it.sap || it.SAP || it.user || it.User || '').trim();
       if (!sap || seen.has(sap)) continue;
       seen.add(sap);
       result.push({
@@ -2744,20 +2770,93 @@ async function loadTop20Winners(today, actId){
   return [];
 }
 
+/* ====== ฟังก์ชันใหม่: Top20 สำหรับ Protocol (Clinic + Non-clinic อย่างละ 10) ====== */
+async function loadTop20ProtocolWinners(today, pairKey){
+  if (!pairKey) return [];
+
+  // หา Act ที่อยู่ใน protocol เดียวกัน (clinic / non-clinic) ของวันนี้
+  const actsToday = getTodayActs() || [];
+  const pairActs = actsToday.filter(a => pairKeyOf(a) === pairKey);
+  if (!pairActs.length) return [];
+
+  const groups = [];
+
+  for (const act of pairActs){
+    const actId = act.ActID || act.id || act.actId || null;
+    if (!actId) continue;
+
+    // winnersByDate จะเก็บผู้ชนะต่อ Act แยกกัน
+    const path = `public/winnersByDate/${today}/${encodeURIComponent(actId)}`;
+    const data = await readJson(path);
+    if (!data || typeof data !== 'object') continue;
+
+    let list = Object.values(data).filter(v => v && typeof v === 'object');
+
+    // เรียงจากเวลาตอบเร็ว → ช้า
+    list.sort((a,b) => {
+      const ta = new Date(a.ts || a.tsISO || a.timestamp || 0).getTime();
+      const tb = new Date(b.ts || b.tsISO || b.timestamp || 0).getTime();
+      return ta - tb;
+    });
+
+    // NEW: ระบุว่า act นี้เป็น Clinic หรือ Non-clinic จาก Category / Group
+    const gRaw = String(
+      act.Category || act.GroupId || act.GroupID || act.Group || ''
+    ).toUpperCase();
+    let groupCode  = '';
+    let groupLabel = '';
+    if (gRaw.includes('NON')) {
+      groupCode  = 'nonclinic';
+      groupLabel = 'Non-clinical';   // <— แก้ตัวสะกดตรงนี้
+    } else if (gRaw.includes('CLINIC')) {
+      groupCode  = 'clinic';
+      groupLabel = 'Clinical';
+    }
+
+    // เก็บคนไม่ซ้ำตาม SAP กลุ่มละสูงสุด 10 คน
+    const seen = new Set();
+    const winners = [];
+
+    for (const it of list){
+      const sap = String(it.sap || it.SAP || '').trim();
+      if (!sap || seen.has(sap)) continue;
+      seen.add(sap);
+      winners.push({
+        sap,
+        ts: it.ts || it.tsISO || it.timestamp || null,
+        groupCode,
+        groupLabel
+      });
+      if (winners.length >= 10) break;
+    }
+
+    if (winners.length) groups.push(winners);
+  }
+
+  if (!groups.length) return [];
+
+  // รวมเป็น array เดียว (เช่น Clinic 10 + Non-clinic 10 = 20)
+  return groups.flat();
+}
+
 // ปุ่ม Top 20 ถูกและเร็ว (วันนี้) — ใช้เฉพาะกิจกรรมแบบ "เลือกช้อย"
 $('#btnWinners').onclick = async () => {
-  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
-const today = todayKey();
+  if (state.userActive === false) {
+    forceLogout('บัญชีถูกปิดใช้งาน (non-active)');
+    return;
+  }
+
+  const today = todayKey();
 
   // ดึงกิจกรรมวันนี้ เรียงตามเวลาเริ่ม
-  const allActs = getTodayActs()
+  const allActs = (getTodayActs() || [])
     .slice()
-    .sort((a,b) => (parseLocal(a.WindowStart)||0) - (parseLocal(b.WindowStart)||0));
+    .sort((a, b) => (parseLocal(a.WindowStart) || 0) - (parseLocal(b.WindowStart) || 0));
 
   // ตัดกิจกรรมแบบ lotto / เลข 2 หลัก ออก
   const candidateActs = allActs.filter(a => !isLottoAct(a));
 
-  // ❌ ถ้าวันนี้ไม่มี choice เลย (มีแต่ lotto) → ไม่ต้องไปอ่าน winnersByDate
+  // ❌ ถ้าวันนี้ไม่มี choice เลย (มีแต่ lotto)
   if (!candidateActs.length) {
     $('#dlgTopTitle').textContent = 'Top 20 (วันนี้) — กิจกรรมแบบเลือกช้อย';
     $('#dlgTopBody').textContent  = 'วันนี้ไม่มีกิจกรรมแบบเลือกช้อย';
@@ -2778,16 +2877,16 @@ const today = todayKey();
   }
 
   let actId = null;
+  let pairKey = null;
   let titleSuffix = '';
 
   if (act) {
     const rawTitle = String(act.Title || act.Question || '').trim();
-    const pk = pairKeyOf(act);
+    pairKey = pairKeyOf(act);
 
-    if (pk) {
+    if (pairKey) {
       // Protocol (Clinic / Non-clinic) → รวมเป็น Protocol เดียว
       const baseTitle = normalizeProtocolTitle(rawTitle) || rawTitle;
-      actId = null;  // อ่าน winners แบบรวมทั้งคู่
       titleSuffix = ` — ${baseTitle || 'Protocol'}`;
     } else {
       // กิจกรรม choice ปกติ ใช้ actId ตรง ๆ
@@ -2799,77 +2898,154 @@ const today = todayKey();
 
   $('#dlgTopTitle').textContent = 'Top 20 (วันนี้)' + titleSuffix;
 
-  // ========= 1) พยายามใช้ winnersByDate (ถูกและเร็ว) ก่อน =========
+  // ========= 1) ใช้ winnersByDate ก่อน (เร็ว + แยก protocol ได้) =========
   try {
-    let winners = await loadTop20Winners(today, actId);
-    if (!winners.length && actId) {
-      // ถ้า act นี้ไม่มีข้อมูล → ลองแบบรวมทั้งวัน แต่ก็ยังเป็นเฉพาะ choice
-      winners = await loadTop20Winners(today, null);
+    let winners = [];
+
+    if (pairKey) {
+      // Protocol: แยก clinic / non-clinic อย่างละ 10 คน
+      winners = await loadTop20ProtocolWinners(today, pairKey);
+      if (!winners.length) {
+        // ถ้าไม่มีเลย → fallback เป็นรวมทุก choice ของวันนี้
+        winners = await loadTop20Winners(today, null);
+      }
+    } else {
+      winners = await loadTop20Winners(today, actId);
+      if (!winners.length && actId) {
+        // ถ้า act นี้ไม่มีข้อมูล → ลองแบบรวมทั้งวัน
+        winners = await loadTop20Winners(today, null);
+      }
     }
 
-    if (winners.length) {
+    if (winners && winners.length) {
       const FB   = await ensureFirebase();
       const snap = await FB.get(FB.ref(FB.db, 'public/usersSummary'));
       const users = snap.val() || {};
 
-const rows = winners.map((w, idx) => {
-    // หาค่า sap ที่แท้จริง (รองรับทุกกรณีของ winnersByDate)
-    let sap = '';
+      // ✳️ ถ้าเป็น protocol → จัดเรียงตามกลุ่มก่อน (Clinic แล้ว Non-clinical)
+      if (pairKey) {
+        const order = { clinic: 1, nonclinic: 2, other: 3 };
+        winners.sort((a, b) => {
+          const ga = order[a.groupCode] || 3;
+          const gb = order[b.groupCode] || 3;
+          if (ga !== gb) return ga - gb;
+          const ta = new Date(a.ts || a.tsISO || a.timestamp || 0).getTime();
+          const tb = new Date(b.ts || b.tsISO || b.timestamp || 0).getTime();
+          return ta - tb; // เร็วกว่าก่อนในแต่ละกลุ่ม
+        });
+      }
 
-    if (w.sap) sap = String(w.sap).trim();
-    else if (w.SAP) sap = String(w.SAP).trim();
-    else if (w.user || w.User) sap = String(w.user || w.User).trim();
-    else if (typeof w === 'string') sap = w.trim();
-    else if (typeof w === 'object') {
-        // หา key ที่เป็น sap ภายใน object ซ้อน
-        for (const k in w) {
+      // ✳️ ตัวนับแยกกลุ่ม
+      const groupRank = { clinic: 0, nonclinic: 0, other: 0 };
+
+      const rows = winners.map((w, idx) => {
+        // หาค่า sap ที่แท้จริง (รองรับหลายรูปแบบ)
+        let sap = '';
+
+        if (w.sap) sap = String(w.sap).trim();
+        else if (w.SAP) sap = String(w.SAP).trim();
+        else if (w.user || w.User) sap = String(w.user || w.User).trim();
+        else if (typeof w === 'string') sap = w.trim();
+        else if (w && typeof w === 'object') {
+          for (const k in w) {
             if (k.toLowerCase().includes('sap')) {
-                sap = String(w[k]).trim();
-                break;
+              sap = String(w[k]).trim();
+              break;
             }
+          }
         }
-    }
+        if (!sap) sap = '-';
 
-    // ถ้ายังไม่เจอ sap เลย → ใส่ '-'
-    if (!sap) sap = '-';
+        const u = users[sap] || {};
+        const name = String(
+          u.fullName || u.name || u.Name || sap
+        ).trim();
 
-    // ดึงข้อมูลผู้ใช้
-    const u = users[sap] || {};
+        // label กลุ่ม
+        let groupLabel = '';
+        let code = 'other';
+        if (pairKey) {
+          if (w.groupCode === 'clinic') {
+            code       = 'clinic';
+            groupLabel = 'Clinical';
+          } else if (w.groupCode === 'nonclinic') {
+            code       = 'nonclinic';
+            groupLabel = 'Non-clinical';
+          } else if (w.groupLabel) {
+            groupLabel = String(w.groupLabel).trim();
+          }
+        }
 
-    const name = String(
-        u.fullName || u.name || u.Name || sap
-    ).trim();
+        // ✳️ ลำดับในแต่ละกลุ่ม (1–10 แยก clinic/non-clinic)
+        let rank;
+        if (pairKey) {
+          groupRank[code] = (groupRank[code] || 0) + 1;
+          rank = groupRank[code];
+        } else {
+          rank = idx + 1;
+        }
 
-    return [idx + 1, name];
-});
+        return pairKey
+          ? [rank, name, groupLabel || '-']  // protocol: 3 คอลัมน์
+          : [rank, name];                    // อื่น ๆ: 2 คอลัมน์เดิม
+      });
 
-      const thead = `
-        <thead>
-          <tr>
-            <th style="width:80px;text-align:center">ลำดับ</th>
-            <th>ชื่อ-นามสกุล</th>
-          </tr>
-        </thead>`;
+      let thead = '';
+      let tbody = '';
 
-      const tbody = rows.length
-        ? `<tbody>${
-            rows.map(r => `
-              <tr>
-                <td style="text-align:center">${r[0]}</td>
-                <td>${escapeHtml(r[1] || '-')}</td>
-              </tr>
-            `).join('')
-          }</tbody>`
-        : `<tbody><tr><td colspan="2" style="text-align:center">—</td></tr></tbody>`;
+      if (pairKey) {
+        // ตารางสำหรับ Protocol: 3 คอลัมน์
+        thead = `
+          <thead>
+            <tr>
+              <th style="width:80px;text-align:center">ลำดับ</th>
+              <th>ชื่อ - สกุล</th>
+              <th style="width:110px;text-align:center">กลุ่ม</th>
+            </tr>
+          </thead>`;
+
+        tbody = rows.length
+          ? `<tbody>${
+              rows.map(r => `
+                <tr>
+                  <td style="text-align:center">${escapeHtml(r[0])}</td>
+                  <td>${escapeHtml(r[1])}</td>
+                  <td style="text-align:center">${escapeHtml(r[2] || '')}</td>
+                </tr>
+              `).join('')
+            }</tbody>`
+          : `<tbody><tr><td colspan="3" style="text-align:center">—</td></tr></tbody>`;
+      } else {
+        // ตารางเดิม: 2 คอลัมน์
+        thead = `
+          <thead>
+            <tr>
+              <th style="width:80px;text-align:center">ลำดับ</th>
+              <th>ชื่อ - สกุล</th>
+            </tr>
+          </thead>`;
+
+        tbody = rows.length
+          ? `<tbody>${
+              rows.map(r => `
+                <tr>
+                  <td style="text-align:center">${escapeHtml(r[0])}</td>
+                  <td>${escapeHtml(r[1])}</td>
+                </tr>
+              `).join('')
+            }</tbody>`
+          : `<tbody><tr><td colspan="2" style="text-align:center">—</td></tr></tbody>`;
+      }
 
       $('#dlgTopBody').innerHTML =
         `<table class="top20-table">${thead}${tbody}</table>`;
       $('#dlgTop').showModal();
       return;
     }
+
   } catch (e) {
-    console.error('loadTop20Winners error', e);
-    // ถ้ามีปัญหาไปใช้ fallback ด้านล่าง
+    console.error('loadTop20Winners / Protocol error', e);
+    // ถ้ามีปัญหา → ไปใช้ fallback ด้านล่าง
   }
 
   // ========= 2) Fallback เดิม: fetchWinnersTable =========
@@ -2920,8 +3096,12 @@ const rows = winners.map((w, idx) => {
 
 // ปุ่ม "ถูกเลข 2 หลัก" — แสดงชื่อ-นามสกุล
 $('#btnLottoAll').onclick = async () => {
-  if (state.userActive === false) { forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); return; }
-const tz        = 'Asia/Bangkok';
+  if (state.userActive === false) {
+    forceLogout('บัญชีถูกปิดใช้งาน (non-active)');
+    return;
+  }
+
+  const tz        = 'Asia/Bangkok';
   const today     = todayKey(tz);
   const now       = new Date();
   const yesterday = dayKeyFromDate(
@@ -2929,33 +3109,54 @@ const tz        = 'Asia/Bangkok';
     tz
   );
 
-  const hasLottoToday = getTodayActs().some(isLottoAct);
+  // === เช็คสถานะกิจกรรม lotto ของ "วันนี้" ===
+  const actsToday   = getTodayActs() || [];
+  const lottoToday  = actsToday.filter(isLottoAct);
+  const hasLottoToday        = lottoToday.length > 0;
+  const hasLottoAnswerToday  = lottoToday.some(
+    a => String(a.Answer || '').trim() !== ''
+  );
 
   try {
     let usedDate = today;
-    let winners  = await loadLottoCorrectForDate(today);
+    let winners  = [];
 
-  // ✅ เฉลยแล้ว แต่ไม่มีใครถูก
-    if (!winners.length && hasLottoToday) {
-      $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว (วันนี้)';
-      $('#dlgTopBody').textContent  = 'งวดนี้ไม่มีใครถูกเลยค่ะ เสียใจอ่ะ';
-      $('#dlgTop').showModal();
-      return;
+    if (hasLottoToday) {
+      // 📌 มี lotto วันนี้ แต่ยังไม่เฉลยเลยสักรายการ
+      if (!hasLottoAnswerToday) {
+        $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว (วันนี้)';
+        $('#dlgTopBody').textContent  = 'รอเวลาหวยออกก่อนนะคะ';
+        $('#dlgTop').showModal();
+        return;
+      }
+
+      // 📌 มี lotto วันนี้ และ admin เฉลยแล้ว → ใช้ผลเฉพาะของวันนี้
+      winners = await loadLottoCorrectForDate(today);
+
+      // ✅ เฉลยแล้ว แต่ไม่มีใครถูก
+      if (!winners.length) {
+        $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว (วันนี้)';
+        $('#dlgTopBody').textContent  = 'งวดนี้ไม่มีใครถูกเลยค่ะ เสียใจอ่ะ 😥';
+        $('#dlgTop').showModal();
+        return;
+      }
+    } else {
+      // 📌 วันนี้ไม่มี lotto เลย → ใช้ logic งวดล่าสุด (วันนี้ / เมื่อวาน) แบบเดิม
+      winners = await loadLottoCorrectForDate(today);
+      if (!winners.length) {
+        winners  = await loadLottoCorrectForDate(yesterday);
+        usedDate = yesterday;
+      }
+
+      if (!winners.length) {
+        $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว';
+        $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
+        $('#dlgTop').showModal();
+        return;
+      }
     }
 
-
-    if (!winners.length) {
-      winners  = await loadLottoCorrectForDate(yesterday);
-      usedDate = yesterday;
-    }
-
-    if (!winners.length) {
-      $('#dlgTopTitle').textContent = 'ผู้ที่ถูกเลขท้าย 2 ตัว';
-      $('#dlgTopBody').textContent  = 'รอรอบหวยออกครั้งถัดไปก่อนนะคะ';
-      $('#dlgTop').showModal();
-      return;
-    }
-
+    // ==== แสดงหัวข้อ dialog ตามวันที่ ====
     $('#dlgTopTitle').textContent =
       (usedDate === today)
         ? 'ผู้ที่ตอบถูกเลข 2 หลัก (วันนี้)'
@@ -3236,7 +3437,7 @@ const pk = pairKeyOf(act);
 
       state.lastSubmission = optimistic;
       
-      // บันทึกแบบเดาไปก่อน
+                // บันทึกแบบเดาไปก่อน
       addOrUpdateWeekly({
         dateISO: ts,
         title: optimistic.title,
@@ -3246,8 +3447,9 @@ const pk = pairKeyOf(act);
         userAnswer: ans,
         Finalized: false
       });
-      // แสดงผลแบบเดาไปก่อน
-      (optimistic);
+
+      // ✅ แสดงผลแบบเดาไปก่อนทันที (ไม่ต้องรอ 1 นาที)
+      renderLatest(optimistic);
 
       $('#actModal').style.display = 'none';
       actOpen = false;
@@ -3592,8 +3794,28 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
     }
 
     // --- คะแนน + โบนัส ---
-    const pts = Number(w.points || 0);
+    const pts   = Number(w.points || 0);
     const bonus = Number(w.bonus || act.BonusPoints || 0);
+
+    // ดูว่า row นี้ Finalized แล้วหรือยัง (Apps Script เขียนแต้มจริงแล้ว)
+    const finalizedFlag = String(w.Finalized ?? w.finalized ?? '')
+      .toLowerCase() === 'true';
+
+    let ptsHtml   = '';
+    let bonusHtml = '';
+
+    if (finalizedFlag) {
+      // ✅ ได้แต้มจริงแล้ว → แสดงตัวเลขตามปกติ
+      ptsHtml = `<b class="pts">${pts}</b>`;
+      bonusHtml = bonus > 0
+        ? `<span class="bonus" style="color:#0a8c4a;font-weight:600">(+${bonus})</span>`
+        : '';
+    } else {
+      // ⏳ เพิ่งส่งคำตอบ ยังไม่ Finalized (ยังรอ Apps Script เขียนลง sheet)
+      // → ไม่แสดง 0 แต่บอกว่ากำลังคำนวณ
+      ptsHtml   = `<span class="pts" style="color:#6b78a6">กำลังคำนวณ…</span>`;
+      bonusHtml = '';
+    }
 
     // --- เฉลย ---
     // ใช้ข้อความจากคอลัมน์ Answer โดยตรง (รองรับ [IMG]...[/IMG])
@@ -3631,11 +3853,10 @@ return `
     <div><b class="lbl">คุณตอบ:</b> ${escapeHtml(userAns)} • ${verdict}</div>
     <div><b class="lbl">เฉลย:</b> ${renderAnswerHTML(correctFull)}</div>
     <div><b class="lbl">แต้มที่ได้รับ:</b> 
-        <b class="pts">${pts}</b> 
-        <span class="bonus" style="color:#0a8c4a;font-weight:600">
-            ${bonus>0 ? `(+${bonus})` : ``}
-        </span>
+        ${ptsHtml}
+        ${bonusHtml}
     </div>
+
   </div>
 `;
 
