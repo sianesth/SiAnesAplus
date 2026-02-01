@@ -1056,6 +1056,35 @@ body.is-login main{
 
 <script type="module">
 window.state = window.state || { sap: "", weeklyRemote: [], offWeekly: null };
+
+// 🔄 FORCE NEW SESSION ON NEW TAB / NEW LINK
+(function forceFreshSession(){
+  const KEY = 'anes.session.url';
+  const cur = location.href.split('#')[0];
+
+  try{
+    const prev = sessionStorage.getItem(KEY);
+    if (prev !== cur){
+      // 👉 ล้าง session ที่ผูกกับหน้าเดิม
+      sessionStorage.clear();
+
+      // 👉 ล้าง cache เฉพาะที่ทำให้ “ข้อมูลค้าง”
+      Object.keys(localStorage).forEach(k=>{
+        if (
+          k.startsWith('anes.latest.') ||
+          k.startsWith('ans_pending:') ||
+          k.startsWith('optPts:') ||
+          k.startsWith('anes.autopopup.')
+        ){
+          localStorage.removeItem(k);
+        }
+      });
+
+      sessionStorage.setItem(KEY, cur);
+    }
+  }catch(_){}
+})();
+
 /* ========= Config ========= */
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
 const { getDatabase, ref, onValue, get, off, child } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
@@ -1162,14 +1191,36 @@ if (data && (
 
     // ====== แสดงผลลัพธ์ทันทีถ้า server ให้สถานะ correct กลับมา ======
 if (data && data.ok && data.correct != null && typeof showAnswerResult === 'function') {
-    if (data.correct === 'TRUE') {
+    if (parseCorrect(data.correct) === true) {
         showAnswerResult(true, Number(data.points || 0));
-    } else if (data.correct === 'FALSE') {
+    } else if (parseCorrect(data.correct) === false) {
         showAnswerResult(false, 0);
     } else {
         showAnswerResult(null, 0); // PENDING
     }
 }
+
+// ✅ OPTIMISTIC KPI: เพิ่มแต้มบนหน้าทันที (ทำเฉพาะกรณี 'ถูกต้อง' เท่านั้น)
+try{
+  const okCorrect = (parseCorrect(data.correct) === true);
+  if (okCorrect){
+    const got = Number(data.points || 0) + Number(data.bonus || 0);
+    const k = `optPts:${todayKey()}:${state.sap}:${payload.actId}`;
+    if (got > 0 && !localStorage.getItem(k)){
+      localStorage.setItem(k,'1');
+      state.total = Number(state.total || 0) + got;
+      if (typeof renderKPI === 'function') renderKPI();
+      if (typeof renderPoints === 'function') renderPoints();
+    }
+  }
+}catch(_){}
+
+// ⚡ เร่ง KPI + เฉลย: ดึงแต้มจาก usersSummary ทันที + อัปเดตกล่องเฉลยจาก meta ทันที
+try{
+  if (typeof pullUserSummary === 'function') pullUserSummary(true);         // true = force fetch
+  if (typeof refreshUserSummary === 'function') refreshUserSummary(true);   // เผื่อมี alias
+  if (typeof fastUpdateLatestAfterSubmit === 'function') fastUpdateLatestAfterSubmit(payload, data);
+}catch(_){}
 
 startFastPollAfterSubmit(payload.actId);
 
@@ -1178,7 +1229,7 @@ try {
         actId: payload.actId,
         title: payload.title || state.currentQuestion?.title,
         userAnswer: payload.answer,
-        result: data.correct === 'TRUE' ? true : data.correct === 'FALSE' ? false : null,
+        result: parseCorrect(data.correct) === true ? true : parseCorrect(data.correct) === false ? false : null,
         points: Number(data.points || 0),
         bonus: Number(data.bonus || 0),
         dateISO: todayKey()
@@ -1188,7 +1239,7 @@ try {
         dateISO: todayKey(),
         actId: payload.actId,
         title: payload.title,
-        result: data.correct === 'TRUE',
+        result: parseCorrect(data.correct) === true,
         points: Number(data.points || 0),
         bonus: Number(data.bonus || 0)
     });
@@ -1197,20 +1248,19 @@ try {
 }
 
 
-/* -----------------------------------------------------
-   ⭐ อัปเดตแต้มในกล่องกิจกรรมทันที (Optimistic UI)
------------------------------------------------------ */
+/*
 try {
-    const box = document.querySelector('#actLatest');
-    if (box) {
-        const pts = box.querySelector('.pts');
-        const bonus = box.querySelector('.bonus');
-        if (pts)   pts.textContent   = Number(data.points || 0);
-        if (bonus) bonus.textContent = Number(data.bonus || 0);
-    }
+  const box = document.querySelector('#actLatest');
+  if (box) {
+    const pts = box.querySelector('.pts');
+    const bonus = box.querySelector('.bonus');
+    if (pts)   pts.textContent   = Number(data.points || 0);
+    if (bonus) bonus.textContent = Number(data.bonus || 0);
+  }
 } catch(err){
-    console.warn("Update score UI failed:", err);
+  console.warn("Update score UI failed:", err);
 }
+*/
 
     /* ============================================================
    ⭐ ใส่โค้ดนี้ตรงนี้พอดี — ล็อก Clinic/Non-clinic ทันทีหลังตอบ
@@ -1291,6 +1341,18 @@ function parseQuestion(q){
   }
 
   return { text:s, img:'' };
+}
+
+
+// ✅ Normalize correct flag from server (supports TRUE/FALSE strings, boolean, lowercase, 1/0)
+function parseCorrect(v){
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v == null) return null;
+  const s = String(v).normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\u00A0/g,' ').trim().toUpperCase();
+  if (s === 'TRUE' || s === 'T' || s === '1') return true;
+  if (s === 'FALSE' || s === 'F' || s === '0') return false;
+  return null; // PENDING/UNKNOWN
 }
 
 function renderQuestionHTML(q){
@@ -1440,18 +1502,26 @@ function startFastPollAfterSubmit(actId){
   if (__fastPollTimer) { clearInterval(__fastPollTimer); __fastPollTimer = null; }
 
   const start = Date.now();
-  const MAX_MS = 20000;     // < 20 วินาที
-  const EVERY = 2000;       // ทุก 2 วินาที (ปรับเป็น 1500 ได้ถ้าต้องการ)
+  const MAX_MS = 30000;   // ให้เวลาพอ (30 วิ)
+  const EVERY  = 1000;    // เช็กทุก 1 วิ
 
   // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
-  function isLatestUpdated(){
-    const box = document.querySelector('#actLatest');
-    if (!box) return false;
-    const txt = box.textContent || '';
-    // มี "เฉลย:" แล้ว + เคสกิจกรรมตรง actId จะชัวร์ขึ้น
-    // (ถ้าคุณมี data-actid ในกล่อง สามารถตรวจแบบนั้นได้ แต่เอาแบบไม่ต้องแก้ renderLatest ก่อน)
-    return txt.includes('เฉลย:') || txt.includes('เฉลย');
-  }
+function isLatestUpdated(){
+  const box = document.querySelector('#actLatest');
+  if (!box) return false;
+
+  const txt = (box.textContent || '').replace(/\s+/g,' ').trim();
+
+  // ต้องเห็นเฉลยแล้ว
+  const hasSolution = txt.includes('เฉลย:') || txt.includes('เฉลย');
+
+  // และ "แต้มที่ได้รับ" ต้องไม่ใช่กำลังคำนวณ/รอคำนวณ
+  const pointsReady =
+    !/แต้มที่ได้รับ\s*:\s*(กำลังคำนวณ|รอคำนวณ|คำนวณ)/.test(txt) &&
+    /แต้มที่ได้รับ\s*:\s*\d+/.test(txt);   // มีตัวเลขแต้มแล้วจริง ๆ
+
+  return hasSolution && pointsReady;
+}
 
   // ยิงรอบแรกทันที (ไม่รอ 2 วิ)
   (async () => {
@@ -1535,40 +1605,23 @@ let state = {
 let fb=null; let actIndex={};
 let _submitting = false;
 
-// ==== Pending KPI (สำหรับโชว์ทันทีแบบ Optimistic) ====
-state._kpiServer = { earned:0, used:0, total:0 };   // ตัวเลขจาก RTDB ล่าสุด
-state._kpiPending = { earned:0, used:0, total:0 };  // ตัวเลขค้างรอยืนยัน
+// ==== KPI (source of truth = Google Sheet: Users) ====
+// ✅ แสดง KPI จากค่า "server" เท่านั้น (ไม่บวกซ้ำแบบ pending/optimistic)
+// เหตุผล: กันอาการแต้มแสดงดับเบิ้ลชั่วคราว (เช่น 4 แล้วรีเฟรชเหลือ 2)
+state._kpiServer = { earned:0, used:0, total:0 };
 
 function renderKPI(){
-  const earned = state._kpiServer.earned + state._kpiPending.earned;
-  const used   = state._kpiServer.used   + state._kpiPending.used;
-  const total  = state._kpiServer.total  + state._kpiPending.total;
+  const earned = Number(state._kpiServer.earned||0);
+  const used   = Number(state._kpiServer.used||0);
+  const total  = Number(state._kpiServer.total||0);
   $('#uEarned').textContent = fmt(earned);
   $('#uUsed').textContent   = fmt(used);
   $('#uTotal').textContent  = fmt(total);
 }
 
-// ใช้เมื่อตัวเลขจาก RTDB เปลี่ยน → เคลียร์ pending ถ้าถูก Sync แล้ว
-function reconcileKPIFromServer(newEarned, newUsed, newTotal){
-  // ถ้าตัวเลขเซิร์ฟเวอร์ “ขยับขึ้น/ปรับแล้ว” ให้รีเซ็ต pending
-  const changed = (
-    newEarned !== state._kpiServer.earned ||
-    newUsed   !== state._kpiServer.used   ||
-    newTotal  !== state._kpiServer.total
-  );
-  state._kpiServer = { earned:newEarned, used:newUsed, total:newTotal };
-  if (changed) {
-    // เซิร์ฟเวอร์ยืนยันผลแล้ว → ล้าง pending ที่รอ
-    state._kpiPending = { earned:0, used:0, total:0 };
-  }
-  renderKPI();
-}
-
-// เพิ่ม/ลด pending แบบเป็นดeltas (+/-)
-function applyKPIDelta(deltaEarned=0, deltaUsed=0){
-  state._kpiPending.earned += deltaEarned;
-  state._kpiPending.used   += deltaUsed;
-  state._kpiPending.total   = state._kpiPending.earned - state._kpiPending.used;
+// ใช้เมื่อตัวเลขจากแหล่งข้อมูล (usersSummary ที่ mirror จาก Google Sheet: Users) เปลี่ยน
+function setKPIFromServer(newEarned, newUsed, newTotal){
+  state._kpiServer = { earned:Number(newEarned||0), used:Number(newUsed||0), total:Number(newTotal||0) };
   renderKPI();
 }
 
@@ -1625,10 +1678,25 @@ if (typeof window.gasJSONP !== 'function') {
 async function checkUserStatusFast(sap){
   const r = await gasJSONP({ act:'userstatus', sap }, 1800);
   if (!r || r.ok !== true) return { found:false, active:false, name:'' };
+
+  // รองรับหลายรูปแบบ payload จาก GAS (บางเวอร์ชันส่ง status แทน active)
   const hasFoundKey = ('found' in r) || ('exists' in r);
-  const found  = hasFoundKey ? !!(r.found ?? r.exists) : (typeof r.active !== 'undefined');
-  const active = !!r.active;
-  const name   = r.name || '';
+  const found = hasFoundKey ? !!(r.found ?? r.exists) : (typeof (r.active ?? r.Active ?? r.status ?? r.Status) !== 'undefined');
+
+  const a = (r.active ?? r.Active ?? r.status ?? r.Status);
+  let active = true; // ถ้าไม่ส่งสถานะมา ให้ถือว่าเข้าได้ (จะไปตรวจซ้ำจาก userSummary อีกที)
+  if (typeof a !== 'undefined' && a !== null){
+    if (typeof a === 'boolean') active = a;
+    else{
+      const s = String(a).trim().toLowerCase();
+      // non-active / inactive
+      if (/(non|in)\s*-?\s*active/.test(s) || /inactive/.test(s) || s === '0' || s === 'false') active = false;
+      else if (s === 'active' || s === '1' || s === 'true') active = true;
+      else active = !!s; // fallback
+    }
+  }
+
+  const name = r.name || '';
   return { found, active, name };
 }
 
@@ -1658,7 +1726,7 @@ document.querySelector('#loginMsg').textContent = 'กำลังตรวจ�
   const st = await checkUserStatusFast(sap);
 
   if (st.found && !st.active){
-  showLoginError('ไม่พบข้อมูลในระบบ • โปรดติดต่อ admin');
+  showLoginError('สถานะ <b>non-active</b> • โปรดติดต่อ admin');
   btn.disabled = false;
   return;
 }
@@ -1696,6 +1764,14 @@ if (!ok && rawStatus !== ''){
 
   ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='block'; });
+
+  // ✅ ตั้งค่า KPI ทันทีจากข้อมูลผู้ใช้ที่เพิ่งดึงมา (source = Users sheet mirror)
+  try{
+    const earned0 = Number(u.PointsEarned ?? u.pointsEarned ?? 0);
+    const used0   = Number(u.PointsUsed   ?? u.pointsUsed   ?? 0);
+    const total0  = Number(u.PointsTotal  ?? u.pointsTotal  ?? (earned0-used0) ?? 0);
+    setKPIFromServer(earned0, used0, total0);
+  }catch(_){ }
 
   setTimeout(()=>{ try{
     attachRealtime();
@@ -1893,29 +1969,42 @@ function hasAns(id){
          d.getDate()===n.getDate();
 }
 
-function titleClinType(t){
-  const s = String(t || '').toLowerCase();
+function titleClinType(x){
+  // รองรับทั้ง string และ object (activity)
+  let s = '';
+  if (x && typeof x === 'object'){
+    s = [
+      x.Category||x.category||'',
+      x.GroupId||x.groupId||'',
+      x.ActID||x.actId||x.id||'',
+      x.Title||x.title||'',
+      x.Question||x.question||''
+    ].join(' ');
+  } else {
+    s = String(x || '');
+  }
+  s = String(s).toLowerCase();
   if (!s) return null;
 
-  // ตรวจจับกลุ่ม non-clinical ก่อน (เพื่อไม่ให้คำว่า 'clinic' ภายในคำว่า non-clinic ทับกัน)
-  if (/\bnon[-\s_]*clin/.test(s) || /\bnon[-\s_]*clinic/.test(s)) {
+  // non-clinical ก่อน (กันคำว่า clinical อยู่ใน non-clinical)
+  if (s.includes('non-clinical') || s.includes('nonclinical') || /non.*clin/.test(s) || /_non[_-]/.test(s) || /non[_-]?cln/.test(s)) {
     return 'nonclin';
   }
-
-  // clinical / clinic
-  if (/\bclinical\b/.test(s) || /\bclinic\b/.test(s) || /\bclin\b/.test(s)) {
+  // clinical
+  if (s.includes('clinical') || /clin/.test(s) || /_cln[_-]/.test(s) || /cln/.test(s)) {
     return 'clin';
   }
-
   return null;
 }
 
 function pairKeyOf(a){
   if (!a) return null;
   const g = a.GroupId || a.groupId || '';
-  const t = a.Title || a.Question || '';
-  const tag = titleClinType(t);
-  return (g && tag) ? String(g) : null;
+  const tag = titleClinType(a);
+  // Protocol: ถ้าจับกลุ่มไม่ได้จาก Title ให้ถือว่ากลุ่มเดียวกันตาม GroupId ได้เลย (กันตอบทั้ง 2 ฝั่งในวันเดียว)
+  const isProtocol = /protocol/i.test(String(a.Category||'')) || /protocol/i.test(String(a.Title||'')) || /protocol/i.test(String(a.GroupId||''));
+  if (g && (tag || isProtocol)) return String(g);
+  return null;
 }
 
 /* ========= Preload activities for titles ========= */
@@ -1945,7 +2034,7 @@ async function attachRealtime(){
   const used   = Number(v.pointsUsed  ||v.PointsUsed  ||0);
   const total  = Number(v.pointsTotal ||v.PointsTotal || (earned - used) || 0);
 
-  reconcileKPIFromServer(earned, used, total);
+  setKPIFromServer(earned, used, total);
 
   // โหลด lock ก่อน แล้วค่อยเรนเดอร์ เพื่อไม่ให้เฟรมแรก enable
   lock = loadLock();
@@ -3495,9 +3584,7 @@ const pk = pairKeyOf(act);
           actId: id,
           title: optimistic.title,
           ts: ts,
-          correct: (server.correct === 'TRUE'
-                      ? true
-                      : (server.correct === 'FALSE' ? false : null)),
+          correct: parseCorrect(server.correct),
           points: Number(server.points || 0),
           userAnswer: ans,
           Finalized: (server.correct !== 'PENDING')
@@ -3518,6 +3605,8 @@ const pk = pairKeyOf(act);
 
         // 🔥 [แก้ไขจุดที่ 1] แล้วค่อยวาดหน้าจอ
         renderLatest(final);
+        // ✅ อัปเดต KPI แบบทันที (optimistic) เพื่อไม่ให้ต้องรอ RTDB sync
+        /* optimistic KPI disabled: source of truth = Users sheet */
 
       } else {
         // ===== 7) fallback → ยิง submit ตรงไป Apps Script =====
@@ -3553,9 +3642,7 @@ const pk = pairKeyOf(act);
             actId: id,
             title: optimistic.title,
             ts: ts,
-            correct: (res.correct === 'TRUE'
-                        ? true
-                        : (res.correct === 'FALSE' ? false : null)),
+            correct: parseCorrect(res.correct),
             points: (res.points == null ? 0 : Number(res.points)),
             userAnswer: ans,
             Finalized: true
@@ -3576,6 +3663,8 @@ const pk = pairKeyOf(act);
 
           // 🔥 [แก้ไขจุดที่ 2] แล้วค่อยวาดหน้าจอ
           renderLatest(final);
+        // ✅ อัปเดต KPI แบบทันที (optimistic) เพื่อไม่ให้ต้องรอ RTDB sync
+        /* optimistic KPI disabled: source of truth = Users sheet */
         }
       }
 
@@ -3623,29 +3712,72 @@ const pk = pairKeyOf(act);
 
 // แปลงตัวอักษรคำตอบ (A/B/C/D หรือ ก/ข/ค/ง) ให้ติดข้อความตัวเลือก
 function mapAnswerText(act, raw){
-  const K = String(raw||'').trim().toUpperCase();
+  const K = String(raw||'').normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\u00A0/g,' ').trim().toUpperCase();
+  if (!K) return '';
+
+  // helper: ดึงข้อความตัวเลือกให้ "ทน" ต่อชื่อฟิลด์หลายแบบ (OptionB/optionB/optB/choices[])
+  function getOpt(letter){
+    const L = String(letter||'').toUpperCase();
+    const keyStd = ({A:'A',B:'B',C:'C',D:'D'}[L]||L);
+    const keyTH  = ({'ก':'A','ข':'B','ค':'C','ง':'D'}[L]||null);
+    const want   = keyTH || keyStd;
+
+    if (!act) return '';
+
+    // 1) ฟิลด์มาตรฐาน
+    const k1 = 'Option' + want;
+    // 2) camel / lowercase
+    const k2 = 'option' + want;
+    // 3) optA/optB
+    const k3 = 'opt' + want;
+    // 4) direct A/B/C/D
+    const k4 = want;
+
+    const v =
+      (act[k1] ?? act[k2] ?? act[k3] ?? act[k4] ??
+       act[String(k1).toLowerCase()] ?? act[String(k2).toLowerCase()] ??
+       null);
+
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+
+    // 5) choices / options array (หลายระบบเก็บเป็น array)
+    const arr = act.Options || act.options || act.choices || act.Choice || act.choice;
+    if (Array.isArray(arr)){
+      const idx = ({A:0,B:1,C:2,D:3}[want]);
+      if (idx != null && arr[idx] != null) return String(arr[idx]).trim();
+    }
+    // 6) options map
+    const map = act.optionsMap || act.OptionsMap || act.optionMap || act.option_map;
+    if (map && typeof map === 'object'){
+      const vv = map[want] ?? map[want.toLowerCase()];
+      if (vv != null && String(vv).trim() !== '') return String(vv).trim();
+    }
+    return '';
+  }
 
   const optMap = {
-    A: act.OptionA, B: act.OptionB, C: act.OptionC, D: act.OptionD,
-    'ก': act.OptionA, 'ข': act.OptionB, 'ค': act.OptionC, 'ง': act.OptionD
+    A: getOpt('A'), B: getOpt('B'), C: getOpt('C'), D: getOpt('D'),
+    'ก': getOpt('A'), 'ข': getOpt('B'), 'ค': getOpt('C'), 'ง': getOpt('D')
   };
 
   // กรณีตอบเป็นตัวอักษรล้วน
   if (['A','B','C','D','ก','ข','ค','ง'].includes(K)){
     const t = optMap[K];
-    return t ? `${K}. ${t}` : K;
+    return t ? `${K}. ${t}` : `${K}. (ไม่มีข้อความตัวเลือกในระบบ)`;
   }
 
-  // กรณีตอบแบบ "A." หรือ "ก)" นำหน้า
-  const m = String(raw||'').trim().match(/^([A-Dก-ง])[\.\)]?/i);
-  const L = m ? m[1].toUpperCase() : '';
-  if (L){
-    const t = optMap[L];
-    return t ? `${L}. ${t}` : raw;
+  // กรณีรูปแบบ "B. ..." / "B) ..." ฯลฯ
+  const mm = K.match(/^([A-Dก-ง])([\.)])?\s*(.*)$/i);
+  if (mm){
+    const mLetter = String(mm[1]||'').toUpperCase();
+    const tail = String(mm[3]||'').trim();
+    const body = tail || optMap[mLetter] || '';
+    if (body) return `${mLetter}. ${body}`;
+    return `${mLetter}. (ไม่มีข้อความตัวเลือกในระบบ)`;
   }
 
-  // ไม่ใช่ตัวเลือก → คืนค่าดิบ
-  return raw;
+  // fallback
+  return String(raw||'').trim();
 }
 
 function isAnsweredToday(actId){
@@ -3789,13 +3921,15 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
     if (rStr === 'true') corr = true;
     else if (rStr === 'false') corr = false;
     else {
-      const pts = Number(w.points || 0);
+      const ptsRaw = (w.Points ?? w.points);
+    const pts    = (ptsRaw==null || ptsRaw==='') ? NaN : Number(ptsRaw);
       corr = pts > 0 ? true : null;
     }
 
     // --- คะแนน + โบนัส ---
-    const pts   = Number(w.points || 0);
-    const bonus = Number(w.bonus || act.BonusPoints || 0);
+    const ptsRaw = (w.Points ?? w.points);
+    const pts    = (ptsRaw==null || ptsRaw==='') ? NaN : Number(ptsRaw);
+    const bonus = Number((w.Bonus ?? w.bonus ?? act.BonusPoints ?? 0));
 
     // ดูว่า row นี้ Finalized แล้วหรือยัง (Apps Script เขียนแต้มจริงแล้ว)
     const finalizedFlag = String(w.Finalized ?? w.finalized ?? '')
@@ -3804,25 +3938,45 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
     let ptsHtml   = '';
     let bonusHtml = '';
 
+    // ✅ กติกาการแสดงผล:
+    // - ถ้า Finalized แล้ว: แสดง pts (0 ก็แสดง 0 = ตอบผิดจริง)
+    // - ถ้ายังไม่ Finalized: ถ้า pts > 0 แสดงแต้ม, ถ้า pts = 0 ให้ขึ้น "กำลังคำนวณ..."
+    const pNum = Number.isFinite(pts) ? Number(pts) : NaN;
+
     if (finalizedFlag) {
-      // ✅ ได้แต้มจริงแล้ว → แสดงตัวเลขตามปกติ
-      ptsHtml = `<b class="pts">${pts}</b>`;
+      ptsHtml = `<b class="pts">${Number.isFinite(pNum) ? pNum : 0}</b>`;
       bonusHtml = bonus > 0
         ? `<span class="bonus" style="color:#0a8c4a;font-weight:600">(+${bonus})</span>`
         : '';
     } else {
-      // ⏳ เพิ่งส่งคำตอบ ยังไม่ Finalized (ยังรอ Apps Script เขียนลง sheet)
-      // → ไม่แสดง 0 แต่บอกว่ากำลังคำนวณ
-      ptsHtml   = `<span class="pts" style="color:#6b78a6">กำลังคำนวณ…</span>`;
-      bonusHtml = '';
+      if (Number.isFinite(pNum) && pNum > 0) {
+        ptsHtml = `<b class="pts">${pNum}</b>`;
+        bonusHtml = bonus > 0
+          ? `<span class="bonus" style="color:#0a8c4a;font-weight:600">(+${bonus})</span>`
+          : '';
+      } else {
+        ptsHtml   = `<span class="pts" style="color:#6b78a6">กำลังคำนวณ…</span>`;
+        bonusHtml = '';
+      }
     }
 
-    // --- เฉลย ---
+// --- เฉลย ---
     // ใช้ข้อความจากคอลัมน์ Answer โดยตรง (รองรับ [IMG]...[/IMG])
     // และถ้า Answer มีแค่ตัวเลือก (เช่น "B" หรือ "ก.") ค่อยดึงข้อความจาก OptionA–D มาเติม
-    const ansRaw = String(act.Answer || '').trim();
-    const optMap = { A: act.OptionA, B: act.OptionB, C: act.OptionC, D: act.OptionD,
-                     'ก': act.OptionA, 'ข': act.OptionB, 'ค': act.OptionC, 'ง': act.OptionD };
+    // หา meta ของกิจกรรมจาก index (กรณีแถว submission ไม่มี Option/Answer ครบ)
+    const _actId = String(act.ActID || act.actId || act.actid || act.Id || act.id || '').trim();
+    const meta = (actIndex && _actId && actIndex[_actId]) ? actIndex[_actId]
+               : (state && state.activityIndex && _actId && state.activityIndex[_actId]) ? state.activityIndex[_actId]
+               : {};
+
+    // Answer/Options อาจมาจาก act (submission row) หรือ meta (activities index)
+    const ansRaw = String(act.Answer || meta.Answer || '').trim();
+    const optMap = {
+      A: (act.OptionA ?? meta.OptionA), B: (act.OptionB ?? meta.OptionB),
+      C: (act.OptionC ?? meta.OptionC), D: (act.OptionD ?? meta.OptionD),
+      'ก': (act.OptionA ?? meta.OptionA), 'ข': (act.OptionB ?? meta.OptionB),
+      'ค': (act.OptionC ?? meta.OptionC), 'ง': (act.OptionD ?? meta.OptionD)
+    };
 
     let correctFull = ansRaw;
 
@@ -3837,6 +3991,37 @@ const weeklyRemote = (state.weeklyRemote || []).filter(r => {
       // ถ้าไม่มีข้อความเลย → ดึงจาก Option ตามตัวเลือก
       const body = tail.trim() || String(fromOpt || '').trim();
       correctFull = body ? `${letter}. ${body}` : letter;
+    }
+
+    // ✅ FALLBACK: ถ้าไม่ได้กรอก Answer/Option ในแถว submission แต่ตัดสินว่า "ถูก"
+    // ให้พยายามดึงข้อความเฉลยจาก meta (activities index) หรือจากตัวเลือกที่ผู้ใช้ตอบ
+    if (!String(correctFull||'').trim() && corr === true) {
+      const userAnsRaw = String(act.AnswerUser || act.userAnswer || act.AnswerSent || act.UserAnswer || act.answer || act.Answer || '').trim();
+      const um = userAnsRaw.match(/^\s*([A-Dก-ง])\s*[\.)]?/i);
+      const uLetter = um ? String(um[1]||'').toUpperCase() : '';
+
+      // 1) ถ้า meta.Answer มีตัวเลือก/ข้อความ
+      const metaAns = String(meta.Answer || '').trim();
+      const mm = metaAns.match(/^([A-Dก-ง])([\.)])?\s*(.*)$/i);
+      if (mm) {
+        const mLetter = String(mm[1]||'').toUpperCase();
+        const tail = String(mm[3]||'').trim();
+        const optText = String((optMap[mLetter]||'') ?? '').trim();
+        const body = tail || optText;
+        if (body) correctFull = `${mLetter}. ${body}`;
+        else if (mLetter) correctFull = mLetter;
+      }
+
+      // 2) ถ้ายังไม่มี ลองดึงจาก Option ตามตัวเลือกที่ผู้ใช้ตอบ
+      if (!String(correctFull||'').trim() && uLetter) {
+        const optText2 = String(optMap[uLetter] || '').trim();
+        if (optText2) correctFull = `${uLetter}. ${optText2}`;
+      }
+
+      // 3) FINAL FALLBACK (ต้องมีข้อความเสมอ)
+      if (!String(correctFull||'').trim()) {
+        correctFull = 'ยังไม่ได้ระบุข้อความเฉลยในระบบ';
+      }
     }
 
     let verdict = '';
@@ -3941,7 +4126,7 @@ function showAnswerResult(isCorrect, points){
 
   // ⭐ บวกแต้มแบบ realtime (กรณีตอบถูก)
   if(isCorrect === true && points>0){
-      applyKPIDelta(points,0);
+      /* (disabled optimistic KPI) */ try{ if(typeof refreshUserSummary==='function') refreshUserSummary(); }catch(_){ }
   }
 
   // ⭐ update weekly local ให้ renderLatest() ดึงไปใช้ได้ทันที
@@ -4419,6 +4604,45 @@ document.addEventListener('click', function(e){
 <div id="imgLightbox" class="img-lightbox">
   <img id="imgLightboxImg" alt="">
 </div>
+
+
+<!-- PATCH 006.33: Safe runtime guard for non-active (no login break) -->
+<script>
+function isUserActive_(u){
+  if (!u) return false;
+  if (typeof u.active === 'boolean') return u.active === true;
+  const st = String(u.status || u.Status || u.Active || '').toLowerCase();
+  return st === 'active';
+}
+
+// attach guard AFTER state.sap exists (do not override login hooks)
+function attachNonActiveGuardWhenReady_(){
+  const MAX = 60; // wait up to ~30s
+  let n = 0;
+  const iv = setInterval(async ()=>{
+    try{
+      if (window.state && state.sap){
+        clearInterval(iv);
+        const FB = await ensureFirebase();
+        const ref = FB.ref(FB.db, 'public/usersSummary/' + state.sap);
+        FB.onValue(ref, snap => {
+          const u = snap.val();
+          if (!isUserActive_(u)){
+            try{ forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); }
+            catch(e){ location.href = 'login.html'; }
+          }
+        });
+      }
+    }catch(e){
+      // ignore
+    }
+    if (++n > MAX) clearInterval(iv);
+  }, 500);
+}
+
+// start watcher on load
+document.addEventListener('DOMContentLoaded', attachNonActiveGuardWhenReady_);
+</script>
 
 </body>
 </html>
