@@ -961,6 +961,30 @@ body.is-login main{
 </div>
 
 <script>
+  /* ========= Global ========= */
+  const APP_VERSION = "2026-02-03-03";  
+
+  (function hardVersionGate(){
+    try{
+      const k="anesa.app.version";
+      const old=localStorage.getItem(k);
+      if(old && old!==APP_VERSION){
+        // ล้างของเก่า (กันหน้าเก่า/logic เก่า)
+        localStorage.removeItem("SAP");
+        localStorage.removeItem("anes.session.v1");
+        // (ถ้าคุณมี key อื่นของระบบเก่า ก็ลบเพิ่มได้)
+      }
+      localStorage.setItem(k, APP_VERSION);
+    }catch(_){}
+  })();
+
+  // ถ้ามี service worker (บางเครื่องเคยติดตั้ง) → ปลดทิ้งเพื่อกัน cache ฝังลึก
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations()
+      .then(rs => rs.forEach(r => r.unregister()))
+      .catch(()=>{});
+  }
+
   function getPointsLeft(){
     const el = document.getElementById('uTotal'); // KPI คงเหลือ
     const v = el ? Number(String(el.textContent||'').replace(/[^\d.-]/g,'')) : 0;
@@ -1306,7 +1330,10 @@ function gasJSONP(params){
     const cb='cb_'+Math.random().toString(36).slice(2);
     window[cb]=d=>{ resolve(d); delete window[cb]; s.remove(); };
     const qs=new URLSearchParams({...params, callback:cb}).toString();
-    const s=document.createElement('script'); s.src=`${SCRIPT_URL}?${qs}`;
+    const s=document.createElement('script'); // ✅ cache buster กันเครื่องค้างระบบเก่า/ดึง response ค้าง
+// ผูกกับ APP_VERSION และเวลาจริง
+s.src = `${SCRIPT_URL}?${qs}&v=${encodeURIComponent(APP_VERSION||'')}&_=${Date.now()}`;
+
     s.onerror=()=>reject(new Error('GAS JSONP error'));
     document.body.appendChild(s);
   });
