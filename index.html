@@ -1075,7 +1075,7 @@ body.is-login main{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.2.1 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 1.2_1 by Zuree.Yoo</span>
 </footer>
 
 <script type="module">
@@ -1154,13 +1154,6 @@ async function postSubmissionToSheet(payload) {
   // ตั้ง pending เพื่อกันคลิกซ้ำทันที (ถ้าส่งไม่สำเร็จจะลบออกด้านล่าง)
   localStorage.setItem(pendKey, String(Date.now()));
 
-// 🔴 OPTIMISTIC UI: แสดงเฉลย/แต้มทันทีหลังกดส่ง (ยังไม่รอ server)
-try {
-  if (typeof showAnswerResult === 'function') {
-    // ยังไม่รู้ผล → แสดงสถานะรอเฉลย + แต้ม 0 ก่อน
-    showAnswerResult(null, 0);
-  }
-} catch (_) {}
 
   try {
     const res = await fetch(url, {
