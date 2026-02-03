@@ -1102,40 +1102,6 @@ const ADMIN_PAGE_URL = "https://sianesth.github.io/Admin_reward/";
 // ⬇️ IMPORTANT: อัปเดตเป็น URL ของ Web App (Deployment ล่าสุด) ลงท้ายด้วย /exec
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOW_Wk7bZYb3zG4qRciOENbBSMo2TRdfdJxXzC1C5tRxav1R_dlF5SuuXKoEkJi84Ig/exec';
 
-// ===============================
-// SAFE PATCH 2026-02-03
-// - บังคับ refresh ให้ได้ไฟล์ใหม่เสมอ (แก้ปัญหา cache ค้าง / ไฟล์เก่า)
-// - ล้าง Service Worker + Cache Storage (ถ้ามี)
-// ===============================
-const APP_BUILD = '2026-02-03-1';
-
-(async function hardRefreshGuard(){
-  try{
-    // 1) kill service workers (บางครั้งทำให้ค้างโค้ดเก่า)
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs) try{ await r.unregister(); }catch(_){}
-    }
-    // 2) clear Cache Storage (ถ้ามี)
-    if (window.caches && caches.keys) {
-      const keys = await caches.keys();
-      for (const k of keys) try{ await caches.delete(k); }catch(_){}
-    }
-  }catch(_){}
-
-  try{
-    // 3) force versioned URL (GitHub Pages มัก cache HTML)
-    const u = new URL(location.href);
-    const v = u.searchParams.get('v');
-    if (v !== APP_BUILD) {
-      u.searchParams.set('v', APP_BUILD);
-      // เก็บ hash เดิมไว้
-      location.replace(u.toString());
-    }
-  }catch(_){}
-})();
-
-
 async function postSubmissionToSheet(payload) {
   const url = (typeof SCRIPT_URL !== 'undefined') ? SCRIPT_URL : '';
   if (!url) {
@@ -1166,12 +1132,10 @@ async function postSubmissionToSheet(payload) {
 
 
   try {
-    const url2 = url + (url.includes('?') ? '&' : '?') + `v=${encodeURIComponent(APP_BUILD)}&t=${Date.now()}`;
-    const res = await fetch(url2, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
-      keepalive: true,
+      keepalive: false,
       cache: 'no-store'
     });
 
@@ -1315,7 +1279,7 @@ try {
 
     // fallback เผื่อ body ว่าง
     localStorage.removeItem(pendKey);
-    return { ok: false, error: 'NO_RESPONSE' };
+    return { ok: true, correct: 'PENDING', points: null };
 
   } catch (e) {
     console.error('Submit error:', e);
@@ -1323,47 +1287,6 @@ try {
     return { ok: false, error: String(e) };
   }
 }
-
-// ===== Retry pending payloads (กันเคสมือถือ/เครื่องเก่าค้างว่า "ส่งแล้ว" แต่จริงๆ ไม่เข้า Sheet) =====
-async function resendPendingPayloads(){
-  try{
-    const keys = [];
-    for (let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      if (k && k.startsWith('anes.pending.payload.')) keys.push(k);
-    }
-    if (!keys.length) return;
-
-    // ส่งทีละอัน ลดโอกาสโดน quota/lock
-    for (const k of keys){
-      let payload = null;
-      try{ payload = JSON.parse(localStorage.getItem(k) || 'null'); }catch(_){ payload=null; }
-      if (!payload || !payload.sap || !payload.actId) { try{ localStorage.removeItem(k); }catch(_){}; continue; }
-
-      // ยิงตรงไป GAS แบบ cache-bust (ไม่ใช้ guard ของ postSubmissionToSheet เพื่อให้ส่งซ้ำได้ถ้าเคยค้าง)
-      try{
-        const url = (typeof SCRIPT_URL !== 'undefined') ? SCRIPT_URL : '';
-        if (!url) continue;
-        const url2 = url + (url.includes('?') ? '&' : '?') + `v=${encodeURIComponent(APP_BUILD)}&t=${Date.now()}`;
-        const r = await fetch(url2, {
-          method:'POST',
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body: JSON.stringify(payload),
-          keepalive: true,
-          cache: 'no-store'
-        });
-        let data=null; try{ data = await r.json(); }catch(_){ data=null; }
-        if (data && (data.ok || data.duplicate || data.error==='already_answered_today' || data.errorCode==='ALREADY_ANSWERED' || data.error==='already_answered_protocol_today' || data.errorCode==='ALREADY_ANSWERED_PROTOCOL')){
-          try{ localStorage.removeItem(k); }catch(_){}
-          try{ localStorage.setItem(aKey(payload.actId),'1'); }catch(_){}
-        }
-      }catch(_){
-        // เงียบไว้ แล้วค่อย retry รอบหน้า
-      }
-    }
-  }catch(_){}
-}
-
 
 // แปลงค่า Status จากชีทให้เป็น boolean
 function isActiveStatus(val){
@@ -1834,9 +1757,6 @@ if (!ok && rawStatus !== ''){
   setWelcome(state.name);
   localStorage.setItem('SAP', sap);
   try{ localStorage.setItem('anes.session.v1', JSON.stringify({sap: state.sap, name: state.name})); }catch{}
-
-  // 🔁 resend payloads ที่ค้าง (ถ้ามี) เพื่อให้เข้า Google Sheet ให้ได้
-  try{ resendPendingPayloads(); }catch(_){ }
 
   document.body.classList.remove('is-login');
   document.querySelector('#loginBox').style.display = 'none';
@@ -3568,14 +3488,13 @@ const pk = pairKeyOf(act);
         ans = String(chk.value || '').trim().toUpperCase();
       }
 
-      // ===== 2) กันกดซ้ำระหว่างส่ง (pending เท่านั้น — ยังไม่ตีตราว่าตอบแล้ว) =====
-      try{
-        const pend = `anes.act.pending.${id}.${todayKey()}.${state.sap||'0'}`;
-        localStorage.setItem(pend, String(Date.now()));
-      }catch(_){ }
+      // ===== 2) ตีตร้าว่าตอบแล้ว (optimistic) =====
+      localStorage.setItem(aKey(id),'1');
+      const pk = pairKeyOf(act);
+      if (pk) localStorage.setItem(clinPairStoreKey(pk),'1');
       localStorage.setItem('anes.act.lastAns.' + id + '.' + (state.sap || ''), ans);
 
-// payload ส่งไป queue
+      // payload ส่งไป queue
       const key = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
       const ts  = new Date().toISOString();
       const payload = {
@@ -3585,8 +3504,6 @@ const pk = pairKeyOf(act);
         timestamp: ts,
         client: 'web-anesa+'
       };
-      try{ localStorage.setItem(`anes.pending.payload.${id}.${todayKey()}.${state.sap||'0'}`, JSON.stringify(payload)); }catch(_){ }
-
 
       // ===== 3) เดาผล "ถูก/ผิด" (Optimistic UI) =====
       const isNumeric = ['NUM2','NUM','NUMBER','NUMERIC'].includes(t);
@@ -3663,15 +3580,6 @@ const pk = pairKeyOf(act);
       if (server && server.ok) {
         success = true;
 
-        try{
-          const pend = `anes.act.pending.${id}.${todayKey()}.${state.sap||'0'}`;
-          localStorage.removeItem(pend);
-          localStorage.removeItem(`anes.pending.payload.${id}.${todayKey()}.${state.sap||'0'}`);
-          localStorage.setItem(aKey(id),'1');
-          const pkF = pairKeyOf(act);
-          if (pkF) localStorage.setItem(clinPairStoreKey(pkF),'1');
-        }catch(_){ }
-
         const final = {
           actId: id,
           title: optimistic.title,
@@ -3722,8 +3630,6 @@ const pk = pairKeyOf(act);
              res.errorCode === 'ALREADY_ANSWERED_PROTOCOL'
         )) {
           success = true;               // กันไม่ให้ไป rollback ธงใน localStorage
-          try{ const pend = `anes.act.pending.${id}.${todayKey()}.${state.sap||'0'}`; localStorage.removeItem(pend);
-          localStorage.removeItem(`anes.pending.payload.${id}.${todayKey()}.${state.sap||'0'}`); }catch(_){ }
           $('#btnActNow').disabled = true;
           checkActivity();              // refresh กล่องกิจกรรม
           return;
@@ -3731,15 +3637,6 @@ const pk = pairKeyOf(act);
 
         if (res && res.ok) {
           success = true;
-
-          try{
-            const pend = `anes.act.pending.${id}.${todayKey()}.${state.sap||'0'}`;
-            localStorage.removeItem(pend);
-          localStorage.removeItem(`anes.pending.payload.${id}.${todayKey()}.${state.sap||'0'}`);
-            localStorage.setItem(aKey(id),'1');
-            const pkF = pairKeyOf(act);
-            if (pkF) localStorage.setItem(clinPairStoreKey(pkF),'1');
-          }catch(_){ }
 
           const final = {
             actId: id,
@@ -3777,9 +3674,8 @@ const pk = pairKeyOf(act);
         unmarkAns(id);
         const pk3 = pairKeyOf(act);
         if (pk3) unmarkClinPair(pk3);
-        try{ const pend = `anes.act.pending.${id}.${todayKey()}.${state.sap||'0'}`; localStorage.removeItem(pend);
-          localStorage.removeItem(`anes.pending.payload.${id}.${todayKey()}.${state.sap||'0'}`); }catch(_){ }
-// ลบรายการ weekly ที่เพิ่งใส่แบบ optimistic
+
+        // ลบรายการ weekly ที่เพิ่งใส่แบบ optimistic
         try {
           const arr = loadWeekly().filter(r =>
             !(String(r.actId||'') === String(id) &&
