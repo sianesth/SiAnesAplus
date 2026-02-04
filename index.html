@@ -1075,7 +1075,7 @@ body.is-login main{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.2_1 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 1.2_01 by Zuree.Yoo</span>
 </footer>
 
 <script type="module">
@@ -4669,45 +4669,6 @@ function attachNonActiveGuardWhenReady_(){
 
 // start watcher on load
 document.addEventListener('DOMContentLoaded', attachNonActiveGuardWhenReady_);
-
-/* ========= Submit answer & show points ========= */
-async function submitAnswer(sap, actId, answer){
-  try{
-    const result = await gasJSONP({
-      act: 'submit',
-      sap: sap,
-      actId: actId,
-      answer: answer,
-      client: 'web-anesa+'
-    });
-
-    if(!result || !result.ok){
-      toast(result?.error || 'ส่งคำตอบไม่สำเร็จ');
-      return;
-    }
-
-    // ===== แสดงผลเฉลย (ของเดิมระบบคุณมีอยู่แล้ว/หรือจะเพิ่มทีหลัง) =====
-    // ตัวอย่าง:
-    // $('#answerResult').textContent = result.correct ? 'ตอบถูก' : 'ตอบผิด';
-
-    // ✅ จุดสำคัญ: แสดงแต้มทันทีหลัง Sheet เข้าสำเร็จ
-    showEarnedPoints(result.points);
-
-  }catch(e){
-    toast('เกิดข้อผิดพลาดระหว่างส่งคำตอบ');
-  }
-}
-
-/* ========= Show earned points immediately ========= */
-function showEarnedPoints(points){
-  const el = document.getElementById('answerPoints');
-  if(!el) return;
-
-  const p = Number(points || 0);
-  el.textContent = `+${p} แต้ม`;
-  el.style.display = 'block';
-}
-
 </script>
 
 </body>
