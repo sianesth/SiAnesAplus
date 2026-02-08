@@ -962,7 +962,7 @@ body.is-login main{
 
 <script>
   /* ========= Global ========= */
-  const APP_VERSION = "2026-02-03-03";  
+  const APP_VERSION = "2026-02-08";  
 
   (function hardVersionGate(){
     try{
@@ -1075,7 +1075,7 @@ body.is-login main{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.2_01 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 1.2_02 by Zuree.Yoo</span>
 </footer>
 
 <script type="module">
@@ -1529,7 +1529,7 @@ function startFastPollAfterSubmit(actId){
   if (__fastPollTimer) { clearInterval(__fastPollTimer); __fastPollTimer = null; }
 
   const start = Date.now();
-  const MAX_MS = 30000;   // ให้เวลาพอ (30 วิ)
+  const MAX_MS = 10000;   // ให้เวลาพอ (10 วิ)
   const EVERY  = 1000;    // เช็กทุก 1 วิ
 
   // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
@@ -1880,6 +1880,7 @@ function renderWeekly(){
   const localArr=loadWeekly().map(x=>({
     dateText:String(x.dateISO||x.ts||''),
     actId:String(x.actId||''),
+    category:String(x.category||''),
     title:String(x.title||''),
     result:x.result,
     points:x.points,
@@ -1890,6 +1891,7 @@ function renderWeekly(){
     // ✅ เพิ่ม x.dateText เป็นตัวเลือกแรก
     dateText: String(x.dateText || x.dateISO || x.ts || x.timestamp || ''),
     actId: String(x.actId || ''),
+    category: String(x.category || ''),
     title: String(x.title || ''),
     result: x.result,
     points: x.points,
@@ -1902,13 +1904,23 @@ function renderWeekly(){
   if(!d) return;
   if(!(d>=wStart && d<wEnd)) return;
   const key = (d.toISOString().slice(0,10)) + '|' + x.actId;
+
+  const meta = getActMetaById(x.actId) || {};
+
+  const label =
+    String(meta.Title || meta.title || '').trim() || // ✅ เอา Title จาก Activities (ชีต) มาก่อนเสมอ
+    String(x.title || '').trim() ||                  // รองลงมา: title ที่มาจาก weeklyByUser/local
+    String(meta.Question || meta.question || '').trim() ||
+    x.actId || '-';
+
   const item = {
     _d: d,
-    title: x.title || (getActMetaById(x.actId)||{}).Title || (getActMetaById(x.actId)||{}).Question || x.actId || '-',
+    title: label,          // ✅ จะกลายเป็น "Category เป็นหลัก"
     result: x.result,
     points: Number(x.points||0),
     _source: x._source
   };
+
   const prev = pickByKey[key];
   if(!prev){ pickByKey[key]=item; return; }
   const better = (prev._source!=='remote' && item._source==='remote') || (item.points > prev.points);
