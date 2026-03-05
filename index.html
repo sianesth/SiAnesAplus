@@ -1156,14 +1156,22 @@ async function postSubmissionToSheet(payload) {
 
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      keepalive: false,
-      cache: 'no-store'
-    });
+    // ✅ iOS/Safari friendly POST (JSON + no-cache + timeout) + faster UI
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const tmo  = ctrl ? setTimeout(() => { try{ ctrl.abort(); }catch(_){ } }, 4500) : null;
 
-    // บางครั้ง GAS จะส่ง 200 พร้อม body ว่าง/ไม่ใช่ JSON → กันไว้
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json;charset=utf-8' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
+      signal: ctrl ? ctrl.signal : undefined
+    }).finally(() => { if (tmo) clearTimeout(tmo); });
+
+// บางครั้ง GAS จะส่ง 200 พร้อม body ว่าง/ไม่ใช่ JSON → กันไว้
     let data = null;
     try { data = await res.json(); } catch (_) { data = null; }
 
@@ -1529,7 +1537,7 @@ function startFastPollAfterSubmit(actId){
   if (__fastPollTimer) { clearInterval(__fastPollTimer); __fastPollTimer = null; }
 
   const start = Date.now();
-  const MAX_MS = 10000;   // ให้เวลาพอ (10 วิ)
+  const MAX_MS = 5000;    // ให้เวลาพอ (5 วิ)
   const EVERY  = 1000;    // เช็กทุก 1 วิ
 
   // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
