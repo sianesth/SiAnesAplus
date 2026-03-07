@@ -1156,22 +1156,14 @@ async function postSubmissionToSheet(payload) {
 
 
   try {
-    // ✅ iOS/Safari friendly POST (JSON + no-cache + timeout) + faster UI
-    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    const tmo  = ctrl ? setTimeout(() => { try{ ctrl.abort(); }catch(_){ } }, 4500) : null;
-
-    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now(), {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json;charset=utf-8' },
       body: JSON.stringify(payload),
-      keepalive: true,
-      cache: 'no-store',
-      mode: 'cors',
-      credentials: 'omit',
-      signal: ctrl ? ctrl.signal : undefined
-    }).finally(() => { if (tmo) clearTimeout(tmo); });
+      keepalive: false,
+      cache: 'no-store'
+    });
 
-// บางครั้ง GAS จะส่ง 200 พร้อม body ว่าง/ไม่ใช่ JSON → กันไว้
+    // บางครั้ง GAS จะส่ง 200 พร้อม body ว่าง/ไม่ใช่ JSON → กันไว้
     let data = null;
     try { data = await res.json(); } catch (_) { data = null; }
 
@@ -1537,7 +1529,7 @@ function startFastPollAfterSubmit(actId){
   if (__fastPollTimer) { clearInterval(__fastPollTimer); __fastPollTimer = null; }
 
   const start = Date.now();
-  const MAX_MS = 5000;    // ให้เวลาพอ (5 วิ)
+  const MAX_MS = 10000;   // ให้เวลาพอ (10 วิ)
   const EVERY  = 1000;    // เช็กทุก 1 วิ
 
   // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
@@ -2854,6 +2846,16 @@ async function fetchWinnersTable(today, actId){
   return { cols:['อันดับ','ชื่อ-นามสกุล'], rows:[] };
 }
 
+
+function winnerOrderValue_(x, fallbackIndex){
+  const keys = ['order','Order','rowOrder','row_no','rowNo','row','Row','seq','Seq','index','Index','idx','Idx','rank','Rank','position','Position'];
+  for (const k of keys){
+    const v = Number(x && x[k]);
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  return 1000000 + (Number.isFinite(fallbackIndex) ? fallbackIndex : 0);
+}
+
 async function loadTop20Winners(today, actId){
   const paths = [
     actId ? `public/winnersByDate/${today}/${encodeURIComponent(actId)}` : null,
@@ -2878,12 +2880,12 @@ async function loadTop20Winners(today, actId){
 
     if (!winners.length) continue;
 
-    // เรียงจากเวลาตอบเร็ว → ช้า
-    winners.sort((a,b) => {
-      const ta = new Date(a.ts || a.tsISO || a.timestamp || 0).getTime();
-      const tb = new Date(b.ts || b.tsISO || b.timestamp || 0).getTime();
-      return ta - tb;
-    });
+    // ✅ เรียงตามลำดับที่บันทึก/ลำดับแถวก่อน เพื่อให้ตรงกับข้อมูลในชีต
+    // ถ้ามี row/order/seq/rank จะใช้ค่านั้นก่อน
+    // ถ้าไม่มี จะคงลำดับเดิมจากข้อมูลต้นทางไว้ ไม่ใช้ timestamp เป็นตัวตัดสิน
+    winners = winners
+      .map((x, i) => ({ ...x, __order: winnerOrderValue_(x, i), __i: i }))
+      .sort((a, b) => (a.__order - b.__order) || (a.__i - b.__i));
 
     // เก็บคนไม่ซ้ำตาม SAP สูงสุด 20 คน
     const seen   = new Set();
@@ -2928,12 +2930,12 @@ async function loadTop20ProtocolWinners(today, pairKey){
 
     let list = Object.values(data).filter(v => v && typeof v === 'object');
 
-    // เรียงจากเวลาตอบเร็ว → ช้า
-    list.sort((a,b) => {
-      const ta = new Date(a.ts || a.tsISO || a.timestamp || 0).getTime();
-      const tb = new Date(b.ts || b.tsISO || b.timestamp || 0).getTime();
-      return ta - tb;
-    });
+    // ✅ เรียงตามลำดับที่บันทึก/ลำดับแถวก่อน เพื่อให้ตรงกับข้อมูลในชีต
+    // ถ้ามี row/order/seq/rank จะใช้ค่านั้นก่อน
+    // ถ้าไม่มี จะคงลำดับเดิมจากข้อมูลต้นทางไว้ ไม่ใช้ timestamp เป็นตัวตัดสิน
+    list = list
+      .map((x, i) => ({ ...x, __order: winnerOrderValue_(x, i), __i: i }))
+      .sort((a, b) => (a.__order - b.__order) || (a.__i - b.__i));
 
     // NEW: ระบุว่า act นี้เป็น Clinic หรือ Non-clinic จาก Category / Group
     const gRaw = String(
