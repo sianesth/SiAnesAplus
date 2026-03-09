@@ -1089,6 +1089,33 @@ body.is-login main{
     pts.max = String(left);   // ⭐ จำกัด max ตามแต้มคงเหลือ
   }
   if (warn) warn.style.display = 'none';
+
+/* ===== KPI FROM SHEET DIRECT ===== */
+async function loadKPIFromSheet(){
+  try{
+    const sap = state?.sap || localStorage.getItem("SAP");
+    if(!sap) return;
+
+    const url = SCRIPT_URL + "?act=getuserpoints&sap=" + encodeURIComponent(sap) + "&_=" + Date.now();
+    const r = await fetch(url);
+    const d = await r.json();
+
+    if(d && d.ok){
+      state._kpiServer = {
+        earned:Number(d.earned||0),
+        used:Number(d.used||0),
+        total:Number(d.total||0)
+      };
+      if(typeof renderKPI === "function") renderKPI();
+    }
+  }catch(e){
+    console.warn("KPI sheet load fail",e);
+  }
+}
+
+/* refresh KPI every 10 seconds */
+setInterval(loadKPIFromSheet,10000);
+
 </script>
 
 <!-- QR Modal -->
@@ -1300,6 +1327,7 @@ try{
       localStorage.setItem(k,'1');
       state.total = Number(state.total || 0) + got;
       if (typeof renderKPI === 'function') renderKPI();
+loadKPIFromSheet();
       if (typeof renderPoints === 'function') renderPoints();
     }
   }
@@ -1409,6 +1437,32 @@ async function hasAnswered(sap, actId){
   const r = await gasJSONP({act:'answered', sap, actId});
   return !!(r && r.ok && r.answered);
 }
+
+
+function applyImmediateKPIFromServer(data){
+  try{
+    if(!data) return;
+    const usedNow = Number(data.pointsUsed ?? data.PointsUsed ?? String(document.getElementById('uUsed')?.textContent || '0').replace(/[^\d.-]/g,'')) || 0;
+    const totalNow = Number(data.pointsTotal ?? data.PointsTotal ?? state._kpiServer?.total ?? 0);
+    let earnedNow = Number(data.pointsEarned ?? data.PointsEarned);
+    if (!Number.isFinite(earnedNow)) earnedNow = totalNow + usedNow;
+    if (Number.isFinite(totalNow)) setKPIFromServer(earnedNow, usedNow, totalNow);
+  }catch(_){ }
+}
+
+async function markAnsweredRemoteNow(actId, tsISO){
+  try{
+    const sap = String(state.sap || localStorage.getItem('SAP') || '').trim();
+    const id  = String(actId || '').trim();
+    if(!sap || !id) return;
+    const day = todayKey('Asia/Bangkok');
+    await Promise.allSettled([
+      fetch(`${DB_URL}/public/answeredToday/${day}/${encodeURIComponent(id)}/${encodeURIComponent(sap)}.json`, { method:'PUT', body:'true' }),
+      fetch(`${DB_URL}/public/answeredByAct/${encodeURIComponent(id)}/${encodeURIComponent(sap)}.json`, { method:'PUT', body: JSON.stringify(String(tsISO || new Date().toISOString())) })
+    ]);
+  }catch(_){ }
+}
+
 
 const fmt = n => Number(n||0).toLocaleString('th-TH');
 const pad2 = n => String(n).padStart(2,'0');
@@ -1622,6 +1676,7 @@ function isLatestUpdated(){
       // บางระบบมี realtime อยู่แล้ว แค่ render ซ้ำก็ขึ้น
       if (typeof renderLatest === 'function') renderLatest();
       if (typeof renderKPI === 'function') renderKPI();
+loadKPIFromSheet();
       if (typeof renderPoints === 'function') renderPoints();
 
       // ถ้ามีฟังก์ชันดึงคะแนน/summary จาก Firebase/GAS ให้เรียกด้วย
@@ -1641,6 +1696,7 @@ function isLatestUpdated(){
       // 2) สั่ง render กล่อง “กิจกรรมวันนี้” ใหม่
       if (typeof renderLatest === 'function') renderLatest();
       if (typeof renderKPI === 'function') renderKPI();
+loadKPIFromSheet();
       if (typeof renderPoints === 'function') renderPoints();
 
       // 3) ถ้าขึ้นแล้ว → หยุดทันที
@@ -1716,6 +1772,7 @@ function renderKPI(){
 function setKPIFromServer(newEarned, newUsed, newTotal){
   state._kpiServer = { earned:Number(newEarned||0), used:Number(newUsed||0), total:Number(newTotal||0) };
   renderKPI();
+loadKPIFromSheet();
 }
 
 /* ========= Firebase ========= */
@@ -3720,8 +3777,10 @@ const pk = pairKeyOf(act);
 
         // 🔥 [แก้ไขจุดที่ 1] แล้วค่อยวาดหน้าจอ
         renderLatest(final);
-        // ✅ อัปเดต KPI แบบทันที (optimistic) เพื่อไม่ให้ต้องรอ RTDB sync
-        /* optimistic KPI disabled: source of truth = Users sheet */
+        try{
+          applyImmediateKPIFromServer(server);
+          await markAnsweredRemoteNow(id, ts);
+        }catch(_){ }
 
       } else {
         // ===== 7) fallback → ยิง submit ตรงไป Apps Script =====
@@ -3778,8 +3837,10 @@ const pk = pairKeyOf(act);
 
           // 🔥 [แก้ไขจุดที่ 2] แล้วค่อยวาดหน้าจอ
           renderLatest(final);
-        // ✅ อัปเดต KPI แบบทันที (optimistic) เพื่อไม่ให้ต้องรอ RTDB sync
-        /* optimistic KPI disabled: source of truth = Users sheet */
+          try{
+            applyImmediateKPIFromServer(res);
+            await markAnsweredRemoteNow(id, ts);
+          }catch(_){ }
         }
       }
 
@@ -4914,6 +4975,33 @@ document.addEventListener('click', function(e){
   }
 });
 
+
+/* ===== KPI FROM SHEET DIRECT ===== */
+async function loadKPIFromSheet(){
+  try{
+    const sap = state?.sap || localStorage.getItem("SAP");
+    if(!sap) return;
+
+    const url = SCRIPT_URL + "?act=getuserpoints&sap=" + encodeURIComponent(sap) + "&_=" + Date.now();
+    const r = await fetch(url);
+    const d = await r.json();
+
+    if(d && d.ok){
+      state._kpiServer = {
+        earned:Number(d.earned||0),
+        used:Number(d.used||0),
+        total:Number(d.total||0)
+      };
+      if(typeof renderKPI === "function") renderKPI();
+    }
+  }catch(e){
+    console.warn("KPI sheet load fail",e);
+  }
+}
+
+/* refresh KPI every 10 seconds */
+setInterval(loadKPIFromSheet,10000);
+
 </script>
 
 <div id="imgLightbox" class="img-lightbox">
@@ -4957,6 +5045,33 @@ function attachNonActiveGuardWhenReady_(){
 
 // start watcher on load
 document.addEventListener('DOMContentLoaded', attachNonActiveGuardWhenReady_);
+
+/* ===== KPI FROM SHEET DIRECT ===== */
+async function loadKPIFromSheet(){
+  try{
+    const sap = state?.sap || localStorage.getItem("SAP");
+    if(!sap) return;
+
+    const url = SCRIPT_URL + "?act=getuserpoints&sap=" + encodeURIComponent(sap) + "&_=" + Date.now();
+    const r = await fetch(url);
+    const d = await r.json();
+
+    if(d && d.ok){
+      state._kpiServer = {
+        earned:Number(d.earned||0),
+        used:Number(d.used||0),
+        total:Number(d.total||0)
+      };
+      if(typeof renderKPI === "function") renderKPI();
+    }
+  }catch(e){
+    console.warn("KPI sheet load fail",e);
+  }
+}
+
+/* refresh KPI every 10 seconds */
+setInterval(loadKPIFromSheet,10000);
+
 </script>
 
 </body>
