@@ -862,7 +862,7 @@ body.is-login main{
 
   <!-- Lotto -->
   <section id="lottoCard" class="card" style="display:none">
-    <h3>🎯 กิจกรรม LOTTO [08:00 - 14:00 น.]</h3>
+    <h3>🎯 กิจกรรม LOTTO [06:00 - 14:00 น.]</h3>
     <div id="lottoTitle" class="muted" style="font-weight:700;margin-bottom:6px"></div>
     <div id="lottoQuestion" class="muted" style="margin-bottom:10px"></div>
     <div class="lotto-input-row">
@@ -1028,7 +1028,7 @@ body.is-login main{
 
 <script>
   /* ========= Global ========= */
-  const APP_VERSION = "2026-03-10";  
+  const APP_VERSION = "2026-02-08";  
 
   (function hardVersionGate(){
     try{
@@ -4957,6 +4957,52 @@ function attachNonActiveGuardWhenReady_(){
 
 // start watcher on load
 document.addEventListener('DOMContentLoaded', attachNonActiveGuardWhenReady_);
+</script>
+
+
+
+
+
+<script>
+/* ===== ANESA+ STABLE LOTTO PATCH ===== */
+let lottoDraft = "";
+
+function initLottoStable(){
+  const el = document.getElementById("lottoInput");
+  if(!el) return;
+
+  el.addEventListener("input",(e)=>{
+    let v = (e.target.value || "").replace(/\D/g,'');
+    if(v.length>2) v=v.slice(0,2);
+    lottoDraft=v;
+    e.target.value=v;
+  });
+}
+
+function restoreLottoStable(){
+  const el=document.getElementById("lottoInput");
+  if(el && lottoDraft){
+    el.value=lottoDraft;
+  }
+}
+
+function getTomorrowKey(){
+  const d = new Date();
+  d.setDate(d.getDate()+1);
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+document.addEventListener("DOMContentLoaded",initLottoStable);
+
+/* restore input after UI render */
+setInterval(()=>{
+  restoreLottoStable();
+},800);
+
+/* ===== END STABLE PATCH ===== */
 </script>
 
 </body>
