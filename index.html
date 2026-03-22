@@ -695,7 +695,7 @@ body.is-login main{
   border-radius:14px;
 
   cursor:default;        /* ✅ ไม่ให้เหมือนกดขยาย */
-  pointer-events:none;   /* ✅ กันคลิก 100% */
+     /* ✅ กันคลิก 100% */
 
   box-shadow:0 6px 18px rgba(0,0,0,.2);
 }
@@ -785,6 +785,81 @@ body.is-login main{
   white-space:nowrap;
 }
 
+
+#privilegeList table{ width:100%; border-collapse:collapse; margin-top:8px; }
+#privilegeList th,#privilegeList td{ border:1px solid var(--line); padding:6px 8px; font-size:12px; text-align:left; }
+#privilegeList th:nth-child(3),#privilegeList td:nth-child(3),
+#privilegeList th:nth-child(4),#privilegeList td:nth-child(4){ text-align:center; width:90px; }
+
+/* ===== MODAL ===== */
+.modal{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal.show{ display:flex; }
+
+.modal-box{
+  width: 90%;
+  max-width: 700px;
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+}
+.modal-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-weight:600;
+  margin-bottom:10px;
+}
+.modal-content{
+  max-height: 60vh;
+  overflow:auto;
+}
+
+
+
+.qty-input {
+  width:84px;
+  min-width:84px;
+  height:44px;
+  text-align:center;
+  font-size:18px;
+  border-radius:16px;
+  border:1px solid #dfe3f0;
+  background:#fff;
+  color:#111827;
+  appearance:auto;
+  -webkit-appearance:auto;
+  pointer-events:auto;
+  touch-action:manipulation;
+  padding:6px 8px;
+}
+.qty-input::-webkit-inner-spin-button,
+.qty-input::-webkit-outer-spin-button {
+  opacity:1;
+  pointer-events:auto;
+  -webkit-appearance:auto;
+  margin:0;
+}
+
+
+</style>
+
+
+<script>
+// === PRIVILEGE API CONFIG ===
+const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL : '';
+</script>
+
+
+<style>
+#redeemStatus{font-weight:600;transition:all .2s ease;}
 </style>
 
 </head>
@@ -877,7 +952,16 @@ body.is-login main{
   </section>
 
   <!-- Rewards -->
-  <section id="rewardsBox" class="card" style="display:none">
+  
+<!-- ===== PRIVILEGE PATCH ===== -->
+<section id="privilegeBox" class="card" style="display:block">
+  <h3>🎟️ แลกสิทธิ์</h3>
+  <button id="btnPrivilegeOpen" class="kpiActionBtn">แต้มแลกสิทธิ์</button>
+<button id="btnMyPrivileges" class="kpiActionBtn">สิทธิ์ที่คุณแลก</button>
+  <div id="privilegeList" style="margin-top:12px"></div>
+</section>
+
+<section id="rewardsBox" class="card" style="display:none">
     <h3>🎁 ของรางวัลที่แลกได้</h3>
      <div id="rewards"></div>
     <div id="lockBanner" class="muted" style="margin-top:6px;display:none">
@@ -890,7 +974,7 @@ body.is-login main{
   <section id="historyBox" class="card" style="display:none">
     <h3>📄 ประวัติการแลก</h3>
     <table>
-      <thead><tr><th>วดป</th><th>รางวัล</th><th>แต้ม</th><th>สถานะ</th></tr></thead>
+      <thead><tr><th>วันที่</th><th>รางวัล</th><th>แต้ม</th><th>สถานะ</th></tr></thead>
       <tbody id="history"><tr><td colspan="4" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
@@ -899,7 +983,7 @@ body.is-login main{
   <section id="weeklyBox" class="card" style="display:none">
     <h3>📅 รายงานกิจกรรมรายสัปดาห์</h3>
     <table>
-      <thead><tr><th>วดป</th><th>ชื่อกิจกรรม</th><th>ผลตอบ</th><th>แต้ม</th></tr></thead>
+      <thead><tr><th>วันที่</th><th>ชื่อกิจกรรม</th><th>ผลตอบ</th><th>แต้ม</th></tr></thead>
       <tbody id="weekly"><tr><td colspan="4" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
@@ -908,7 +992,7 @@ body.is-login main{
   <section id="annualBox" class="card" style="display:none">
     <h3>🗓️ รายงานทำแบบสอบถามประจำปี</h3>
     <table>
-      <thead><tr><th>วดป</th><th>ชื่อแบบสอบถาม</th><th>แต้ม</th></tr></thead>
+      <thead><tr><th>วันที่</th><th>ชื่อแบบสอบถาม</th><th>แต้ม</th></tr></thead>
       <tbody id="annual"><tr><td colspan="3" style="text-align:center">—</td></tr></tbody>
     </table>
   </section>
@@ -919,7 +1003,7 @@ body.is-login main{
     <table>
       <thead>
          <tr>
-           <th>วดป</th>
+           <th>วันที่</th>
            <th>ชื่อ-นามสกุล</th>
            <th style="text-align:center">แต้ม</th>
            <th style="text-align:center">สถานะ</th>
@@ -928,6 +1012,20 @@ body.is-login main{
       <tbody id="transferRows"><tr><td colspan="4" style="text-align:center" class="muted">—</td></tr></tbody>
     </table>
   </section>
+
+<section id="adminReset" class="card" style="display:none">
+  <h3>⚙️ Admin Reset ข้อมูล</h3>
+  <div class="row">
+    <select id="resetType">
+      <option value="transfer">โอนแต้ม</option>
+      <option value="reward">แลกรางวัล</option>
+    </select>
+    <input type="date" id="resetDate">
+    <button onclick="adminReset()">รีเซ็ต</button>
+  </div>
+  <div class="muted">*เป็นการรีเซ็ตการแสดงผล ไม่ลบข้อมูลจริง</div>
+</section>
+
 </main>
 
 <div id="top20Modal" class="modal" style="display:none">
@@ -1028,7 +1126,7 @@ body.is-login main{
 
 <script>
   /* ========= Global ========= */
-  const APP_VERSION = "2026-02-08";  
+  const APP_VERSION = "2026-03-22";  
 
   (function hardVersionGate(){
     try{
@@ -1141,7 +1239,7 @@ body.is-login main{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.2.3 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 1.2.4 by Zuree.Yoo</span>
 </footer>
 
 <script type="module">
@@ -1313,6 +1411,18 @@ try{
 }catch(_){}
 
 startFastPollAfterSubmit(payload.actId);
+      // ⭐ ENTERPRISE SYNC PATCH (safe)
+      setTimeout(async ()=>{
+        try{
+          const SAP = localStorage.getItem('SAP') || state.sap;
+          const today = todayKey();
+          await fetch(`${DB_URL}/public/answeredToday/${today}/${payload.actId}/${SAP}.json?t=${Date.now()}`,{cache:'no-store'});
+          if(typeof renderLatest==='function') renderLatest();
+          if(typeof renderKPI==='function') renderKPI();
+          if(typeof renderPoints==='function') renderPoints();
+        }catch(e){}
+      },800);
+
 
 try {
     renderLatest([{
@@ -1596,7 +1706,7 @@ function startFastPollAfterSubmit(actId){
 
   const start = Date.now();
   const MAX_MS = 10000;   // ให้เวลาพอ (10 วิ)
-  const EVERY  = 1000;    // เช็กทุก 1 วิ
+  const EVERY = 2000;    // เช็กทุก 1 วิ
 
   // helper: ดูว่ากล่องกิจกรรมวันนี้อัปเดตเป็นกิจกรรมนี้แล้วหรือยัง
 function isLatestUpdated(){
@@ -2276,7 +2386,7 @@ function renderRewards(){
       name,
       v,
       need: needOf(v),
-      stock: Number(v.stock ?? v.Stock ?? 0) || 0
+      stock: Number(v.stock ?? v.แลกสิทธิ์ทั้งหมด ?? 0) || 0
     }))
     .sort((a, b) => (b.need - a.need) || (b.stock - a.stock) || a.name.localeCompare(b.name, 'th'));
 
@@ -4964,7 +5074,9 @@ document.addEventListener('DOMContentLoaded', attachNonActiveGuardWhenReady_);
 
 
 <script>
-/* ===== ANESA+ STABLE LOTTO PATCH ===== */
+
+/* ===== ANESA+ LOTTO FINAL STABLE PATCH ===== */
+
 let lottoDraft = "";
 
 function initLottoStable(){
@@ -4972,38 +5084,681 @@ function initLottoStable(){
   if(!el) return;
 
   el.addEventListener("input",(e)=>{
+
     let v = (e.target.value || "").replace(/\D/g,'');
-    if(v.length>2) v=v.slice(0,2);
-    lottoDraft=v;
-    e.target.value=v;
+
+    if(v.length > 2) v = v.slice(0,2);
+
+    lottoDraft = v;
+
+    if(e.target.value !== v){
+      e.target.value = v;
+    }
+
   });
 }
 
 function restoreLottoStable(){
-  const el=document.getElementById("lottoInput");
-  if(el && lottoDraft){
-    el.value=lottoDraft;
+  const el = document.getElementById("lottoInput");
+  if(!el) return;
+
+  if(!el.value && lottoDraft){
+    el.value = lottoDraft;
   }
 }
 
-function getTomorrowKey(){
+function getLottoAnswerKeys(){
   const d = new Date();
-  d.setDate(d.getDate()+1);
-  const y=d.getFullYear();
-  const m=String(d.getMonth()+1).padStart(2,'0');
-  const day=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
+
+  const today = new Date(d);
+  const tomorrow = new Date(d);
+  tomorrow.setDate(d.getDate()+1);
+
+  const format = (x)=>{
+    const y = x.getFullYear();
+    const m = String(x.getMonth()+1).padStart(2,'0');
+    const day = String(x.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+
+  return [format(today),format(tomorrow)];
 }
 
-document.addEventListener("DOMContentLoaded",initLottoStable);
+document.addEventListener("DOMContentLoaded",()=>{
+  initLottoStable();
+  setTimeout(restoreLottoStable,500);
+});
 
-/* restore input after UI render */
-setInterval(()=>{
-  restoreLottoStable();
-},800);
+/* ===== END LOTTO PATCH ===== */
 
-/* ===== END STABLE PATCH ===== */
 </script>
 
+
+<script>
+let __submitLock = false;
+
+async function safeFetch(url, opts){
+  try{
+    const ctrl = new AbortController();
+    setTimeout(()=>ctrl.abort(),6000);
+    return await fetch(url + '?t=' + Date.now(),{...opts, signal:ctrl.signal});
+  }catch(e){
+    return await fetch(url,opts);
+  }
+}
+
+function guardSubmit(btn){
+  if(__submitLock) return false;
+  __submitLock = true;
+  if(btn) btn.disabled = true;
+  setTimeout(()=>{
+    __submitLock = false;
+    if(btn) btn.disabled = false;
+  },2000);
+  return true;
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  const input = document.getElementById("lottoInput");
+  if(input){
+    input.addEventListener("input", e=>{
+      let v = e.target.value.replace(/\D/g,'').slice(0,2);
+      if(e.target.value !== v) e.target.value = v;
+    });
+  }
+});
+</script>
+
+
+<script>
+async function adminReset(){
+  const type = document.getElementById("resetType").value;
+  const date = document.getElementById("resetDate").value;
+
+  if(!date){
+    alert("เลือกวันที่");
+    return;
+  }
+
+  try{
+    await fetch(SCRIPT_URL,{
+      method:'POST',
+      body: JSON.stringify({
+        action:'admin_reset',
+        type:type,
+        date:date
+      })
+    });
+    alert("รีเซ็ตสำเร็จ");
+  }catch(e){
+    alert("เกิดข้อผิดพลาด");
+  }
+}
+</script>
+
+
+<!-- ⭐ PATCH: REPORT WINDOW LOGIC -->
+<script>
+function parseDateLocal(d){
+  if(!d) return null;
+  const x = new Date(d);
+  if(!isNaN(x)) return x;
+  const m = String(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m){ return new Date(m[3], m[2]-1, m[1]); }
+  return null;
+}
+function isInRolling3Months(dateStr){
+  const d = parseDateLocal(dateStr);
+  if(!d) return false;
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth()+3, 0);
+  return d >= start && d <= end;
+}
+function isInCurrentYear(dateStr){
+  const d = parseDateLocal(dateStr);
+  if(!d) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear();
+}
+function getRolling3MonthLabel(){
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth()+2, 1);
+  const m = ['มค','กพ','มีค','เมย','พค','มิย','กค','สค','กย','ตค','พย','ธค'];
+  return `${m[start.getMonth()]}-${m[end.getMonth()]} ${start.getFullYear()+543}`;
+}
+</script>
+
+
+
+
+<!-- ===== PRIVILEGE MODAL (SAFE MERGE) ===== -->
+<div id="privilegeModal" class="modal" style="display:none">
+  <div class="modal-card transfer-card">
+    <div class="transfer-header">
+      <div class="transfer-title">🎟️ แลกสิทธิ์</div>
+    </div>
+
+    <div id="pvList" style="margin-top:8px"></div>
+
+    <div style="margin-top:12px;font-weight:800">
+      แต้มที่ใช้: <span id="pvTotal">0</span>
+    </div>
+    <div id="pvWarn" class="tr-warn" style="display:none">แต้มไม่พอ</div>
+
+    <div class="transfer-actions">
+      <button id="btnPvCancel" type="button" class="btn-transfer-secondary">ยกเลิก</button>
+      <button id="btnPvNext" type="button" class="btn-transfer-primary">แลกสิทธิ์</button>
+    </div>
+
+    <div id="pvConfirmBox" style="display:none;margin-top:16px;border:1px solid #e6e9f2;border-radius:16px;padding:12px;background:#fff">
+      <div id="pvConfirmText" style="font-size:14px;line-height:1.5"></div>
+      <div class="transfer-actions" style="margin-top:10px">
+        <button id="btnPvBack" type="button" class="btn-transfer-secondary">ย้อนกลับ</button>
+        <button id="btnPvConfirm" type="button" class="btn-transfer-primary" style="background:#0a8c4a">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PRIV_API = 'https://script.google.com/macros/s/AKfycbwPOW_Wk7bZYb3zG4qRciOENbBSMo2TRdfdJxXzC1C5tRxav1R_dlF5SuuXKoEkJi84Ig/exec';
+  let pvData = [];
+  let pvSelected = [];
+
+  function pvModal(){ return document.getElementById('privilegeModal'); }
+  function pvListEl(){ return document.getElementById('pvList'); }
+  function pvTotalEl(){ return document.getElementById('pvTotal'); }
+  function pvWarnEl(){ return document.getElementById('pvWarn'); }
+  function pvConfirmBox(){ return document.getElementById('pvConfirmBox'); }
+  function pvConfirmText(){ return document.getElementById('pvConfirmText'); }
+  function userPoints(){
+    try{
+      if(typeof getPointsLeft === 'function') return Number(getPointsLeft() || 0);
+    }catch(_){}
+    const el = document.getElementById('uTotal');
+    return Number(String((el && el.textContent) || '0').replace(/[^\d.-]/g,'')) || 0;
+  }
+  function esc(s){
+    return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+  function activeValue(v){
+    if(v === true) return true;
+    const s = String(v ?? '').trim().toLowerCase();
+    return s === 'true' || s === '1' || s === 'yes' || s === 'active';
+  }
+
+  async function openPrivilegeModal(){
+    pvSelected = [];
+    if (pvConfirmBox()) pvConfirmBox().style.display = 'none';
+    if (pvWarnEl()) pvWarnEl().style.display = 'none';
+    if (pvTotalEl()) pvTotalEl().textContent = '0';
+    if (pvListEl()) pvListEl().innerHTML = '<div class="muted">กำลังโหลด...</div>';
+    if (pvModal()) pvModal().style.display = 'flex';
+    await loadPrivileges();
+  }
+
+  function closePrivilegeModal(){
+    if (pvModal()) pvModal().style.display = 'none';
+  }
+
+  function calcPrivilege(){
+    let total = 0;
+    pvSelected.forEach(x => total += Number(x.qty||0) * Number(x.pointsPerRight||0));
+    if (pvTotalEl()) pvTotalEl().textContent = String(total);
+    const warn = pvWarnEl();
+    const nextBtn = document.getElementById('btnPvNext');
+    if(total > userPoints()){
+      if(warn) warn.style.display = 'block';
+      if(nextBtn) nextBtn.disabled = true;
+    }else{
+      if(warn) warn.style.display = 'none';
+      if(nextBtn) nextBtn.disabled = false;
+    }
+  }
+
+  function updatePrivilege(id, qty){
+    const q = Math.max(0, parseInt(qty || '0', 10) || 0);
+    pvSelected = pvSelected.filter(x => String(x.id) !== String(id));
+    const item = pvData.find(x => String(x.PrivilegeID) === String(id));
+    if(item && q > 0){
+      pvSelected.push({
+        id: item.PrivilegeID,
+        name: item.PrivilegeName,
+        qty: q,
+        pointsPerRight: Number(item.PointsPerRight || 0)
+      });
+    }
+    if (pvConfirmBox()) pvConfirmBox().style.display = 'none';
+    calcPrivilege();
+  }
+
+  async function loadPrivileges(){
+    try{
+      const r = await fetch(PRIV_API + '?action=getPrivileges&_=' + Date.now(), { cache:'no-store' });
+      const j = await r.json();
+      const raw = j.data || j.list || j.items || [];
+      pvData = raw.filter(x => x && (x.Active == null || activeValue(x.Active)))
+                  .sort((a,b) => Number(a.Sort||0) - Number(b.Sort||0));
+      if(!pvData.length){
+        pvListEl().innerHTML = '<div class="muted">ไม่มีรายการสิทธิ์</div>';
+        return;
+      }
+      pvListEl().innerHTML = pvData.map(p => {
+        const totalChange = Number(p.TotalChange || p.totalChange || 0);
+        return `
+        <div class="reward" style="justify-content:space-between;align-items:center">
+          <div style="flex:1;min-width:0">
+            <b>${esc(p.PrivilegeName)}</b>
+            <div class="muted">${esc(p.Description || '')}</div>
+            <div class="pill">แลกสิทธิ์ทั้งหมด ${totalChange}</div>
+          </div>
+          <input type="number" min="0" max="${Math.max(0,totalChange)}" value="0"
+                 data-pvid="${esc(p.PrivilegeID)}"
+                 class="qty-input"
+                 inputmode="numeric"
+                 step="1">
+        </div>
+      `;
+      }).join('');
+      pvListEl().querySelectorAll('input[data-pvid]').forEach(inp => {
+        inp.addEventListener('input', () => updatePrivilege(inp.getAttribute('data-pvid'), inp.value));
+      });
+      calcPrivilege();
+    }catch(err){
+      console.error(err);
+      pvListEl().innerHTML = '<div class="bad">โหลดข้อมูลสิทธิ์ไม่สำเร็จ</div>';
+    }
+  }
+
+
+  let pvRefreshTimer = null;
+  function refreshPrivilegesRealtime(){
+    const modalOpen = !!(pvModalEl() && pvModalEl().style.display === 'flex');
+    if (!modalOpen) return;
+    loadPrivileges();
+  }
+
+  function localRenderHistory(items){
+    const box = document.getElementById('privilegeList');
+    if(!box) return;
+    const html = items.map(x => `
+      <div class="reward">
+        <div>
+          <b>${esc(x.name)}</b><br>
+          ใช้ ${Number(x.pointsPerRight||0) * Number(x.qty||0)} แต้ม • จำนวน ${Number(x.qty||0)}
+        </div>
+      </div>
+    `).join('');
+    box.innerHTML = html + box.innerHTML;
+  }
+
+  async function loadPrivilegeHistory(){
+    const sap = String(localStorage.getItem('SAP') || (window.state && state.sap) || '').replace(/\D/g,'').trim();
+    const box = document.getElementById('privilegeList');
+    if(!box) return;
+
+    if(!sap){
+      box.innerHTML = '<div class="muted" style="text-align:center;padding:12px">กรุณาเข้าสู่ระบบ</div>';
+      return;
+    }
+
+    box.innerHTML = '<div class="muted" style="text-align:center;padding:12px">กำลังโหลด...</div>';
+
+    try{
+      let list = [];
+
+      if (typeof gasJSONP === 'function'){
+        try{
+          const j = await gasJSONP({ act:'getMyPrivileges', sap:sap });
+          list = (j && (j.data || j.list || j.items)) || [];
+        }catch(_){}
+      }
+
+      if((!Array.isArray(list) || !list.length) && PRIV_API){
+        try{
+          const r = await fetch(PRIV_API + '?action=getMyPrivileges&sap=' + encodeURIComponent(sap) + '&_=' + Date.now(), { cache:'no-store' });
+          const j = await r.json();
+          list = j.list || j.data || j.items || [];
+        }catch(_){}
+      }
+
+      if(!Array.isArray(list) || !list.length){
+        box.innerHTML = '<div class="muted" style="text-align:center;padding:12px">ยังไม่มีรายการแลกสิทธิ์</div>';
+        return;
+      }
+
+      list.sort(function(a,b){
+        const da = new Date(a.Timestamp || a.timestamp || a.date || 0).getTime() || 0;
+        const db = new Date(b.Timestamp || b.timestamp || b.date || 0).getTime() || 0;
+        return db - da;
+      });
+
+      box.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>วันที่</th>
+              <th>รายการแลกสิทธิ์</th>
+              <th style="text-align:center">สิทธิ์ที่ได้</th>
+              <th style="text-align:center">แต้มที่ใช้</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(x => `
+              <tr>
+                <td>${typeof thaiFromKeys === 'function' ? thaiFromKeys(x, ['Timestamp','timestamp','date']) : (x.Timestamp || x.date || '-')}</td>
+                <td>${esc(x.PrivilegeName || x.name || '')}</td>
+                <td style="text-align:center">${Number(x.Quantity || x.qty || 0)}</td>
+                <td style="text-align:center">${Number(x.PointsUsed || x.pointsUsed || 0)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }catch(err){
+      console.warn('loadPrivilegeHistory failed', err);
+      box.innerHTML = '<div class="bad" style="text-align:center;padding:12px">โหลดข้อมูลสิทธิ์ไม่สำเร็จ</div>';
+    }
+  }
+
+  function submitPrivilege(){
+    const total = Number((pvTotalEl() && pvTotalEl().textContent) || '0') || 0;
+    if(total <= 0){
+      if(typeof toast === 'function') toast('กรุณาเลือกสิทธิ์');
+      else alert('กรุณาเลือกสิทธิ์');
+      return;
+    }
+    if(total > userPoints()){
+      if(typeof toast === 'function') toast('แต้มไม่พอ');
+      else alert('แต้มไม่พอ');
+      return;
+    }
+    if(!pvConfirmText() || !pvConfirmBox()) return;
+    pvConfirmText().innerHTML = 'ยืนยันแลก ' + pvSelected.map(x => `${esc(x.name)} x${Number(x.qty||0)}`).join(', ')
+      + `<div style="margin-top:6px">ใช้รวม <b>${total}</b> แต้ม</div>`;
+    pvConfirmBox().style.display = 'block';
+  }
+
+  async function confirmPrivilege(){
+    const sap = localStorage.getItem('SAP') || '';
+    const fullName = localStorage.getItem('FULLNAME') || '';
+    const items = pvSelected.map(x => ({
+      id: x.id,
+      name: x.name,
+      qty: Number(x.qty||0),
+      pointsPerRight: Number(x.pointsPerRight||0)
+    }));
+    try{
+      const r = await fetch(PRIV_API, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action:'redeemPrivilege',
+          sap,
+          fullName,
+          items
+        })
+      });
+      let j = {};
+      try{ j = await r.json(); }catch(_){}
+      if(j && j.ok === false){
+        throw new Error(j.msg || j.error || 'redeem failed');
+      }
+      closePrivilegeModal();
+      localRenderHistory(items);
+      if(typeof toast === 'function') toast('แลกสิทธิ์สำเร็จ');
+      loadPrivilegeHistory();
+      try{
+        if(typeof refreshUserSummary === 'function') refreshUserSummary(true);
+      }catch(_){}
+    }catch(err){
+      console.error(err);
+      if(typeof toast === 'function') toast('แลกสิทธิ์ไม่สำเร็จ');
+      else alert('แลกสิทธิ์ไม่สำเร็จ');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnPrivilegeOpen');
+    if(btn){
+      btn.removeAttribute('onclick');
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        openPrivilegeModal();
+      });
+    }
+    document.getElementById('btnPvCancel')?.addEventListener('click', closePrivilegeModal);
+    document.getElementById('btnPvBack')?.addEventListener('click', function(){
+      if(pvConfirmBox()) pvConfirmBox().style.display = 'none';
+    });
+    document.getElementById('btnPvNext')?.addEventListener('click', submitPrivilege);
+    document.getElementById('btnPvConfirm')?.addEventListener('click', confirmPrivilege);
+    const btnMyPrivileges = document.getElementById('btnMyPrivileges');
+    if(btnMyPrivileges){
+      btnMyPrivileges.removeAttribute('onclick');
+      btnMyPrivileges.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        loadPrivilegeHistory();
+      });
+    }
+    loadPrivilegeHistory();
+  });
+
+  window.openPrivilegeModal = openPrivilegeModal;
+  window.closePrivilegeModal = closePrivilegeModal;
+})();
+</script>
+
+
+<script>
+
+
+
+
+<!-- ===== PRIVILEGE MODAL ===== -->
+<div id="privModal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>🎟️ สิทธิ์ที่คุณแลก</span>
+      <button id="btnClosePrivModal">✕</button>
+    </div>
+    <div id="privModalContent" class="modal-content">
+      กำลังโหลด...
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('#btnMyPrivileges');
+  if (!btn) return;
+
+  e.preventDefault();
+
+  const modal = document.getElementById('privModal');
+  const content = document.getElementById('privModalContent');
+
+  modal.classList.add('show');
+  content.innerHTML = 'กำลังโหลด...';
+
+  loadPrivilegeHistoryModal();
+});
+
+document.addEventListener('click', function(e){
+  if(e.target.id === 'btnClosePrivModal' || e.target.id === 'privModal'){
+    document.getElementById('privModal').classList.remove('show');
+  }
+});
+
+async function loadPrivilegeHistoryModal(){
+  const box = document.getElementById('privModalContent');
+  const sap = localStorage.getItem('SAP') || (window.state && state.sap);
+
+  try{
+    const res = await gasJSONP({
+      act:'getMyPrivileges',
+      sap:sap
+    });
+
+    const list = res.data || [];
+
+    if (!list.length){
+      box.innerHTML = '<div class="muted">ยังไม่มีรายการ</div>';
+      return;
+    }
+
+    list.sort((a,b)=> new Date(b.Timestamp) - new Date(a.Timestamp));
+
+    box.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>วันที่</th><th>รายการแลกสิทธิ์</th><th>จำนวนสิทธิ์</th><th>จำนวนแต้มที่ใช้แลก</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(r=>`
+            <tr>
+              <td>${thaiDate(anyToDate(r.Timestamp))}</td>
+              <td>${r.PrivilegeName}</td>
+              <td style="text-align:center">${r.Quantity}</td>
+              <td style="text-align:center">${r.PointsUsed}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }catch(e){
+    box.innerHTML = 'โหลดไม่สำเร็จ';
+  }
+}
+</script>
+
+
+<script>
+// FIX ALL NUMBER INPUTS
+function fixAllQtyInput(){
+  document.querySelectorAll('.qty-input, input[type="number"]').forEach(el=>{
+    if(el.type !== 'number'){ el.type = 'number'; }
+    el.setAttribute('min','0');
+    el.setAttribute('step','1');
+    el.style.pointerEvents='auto';
+    el.style.touchAction='manipulation';
+    el.addEventListener('input', ()=>{
+      let v = parseInt(el.value || '0');
+      if(isNaN(v) || v < 0) v = 0;
+      el.value = v;
+    });
+  });
+}
+setInterval(fixAllQtyInput,1000);
+
+/* ===== UX POLISH SAFE (NO BREAK LOGIN) ===== */
+(function(){
+  const btn = document.getElementById('btnActSubmit');
+  if(btn){
+    const originalClick = btn.onclick;
+    btn.onclick = async function(e){
+      try{
+        btn.disabled = true;
+        const old = btn.innerText;
+        btn.innerText = "⏳ กำลังส่ง...";
+        if(originalClick){ await originalClick.call(this, e); }
+        setTimeout(()=>{ btn.innerText = old || "ส่งคำตอบ"; btn.disabled = false; },1200);
+      }catch(err){
+        btn.innerText = "ส่งคำตอบ";
+        btn.disabled = false;
+      }
+    };
+  }
+})();
+
+(function(){
+  const btn = document.getElementById('btnLottoSubmit');
+  if(btn){
+    const originalClick = btn.onclick;
+    btn.onclick = async function(e){
+      try{
+        btn.disabled = true;
+        const old = btn.innerText;
+        btn.innerText = "⏳ กำลังส่ง...";
+        if(originalClick){ await originalClick.call(this, e); }
+        setTimeout(()=>{ btn.innerText = old || "ส่งคำตอบ"; btn.disabled = false; },1200);
+      }catch(err){
+        btn.innerText = "ส่งคำตอบ";
+        btn.disabled = false;
+      }
+    };
+  }
+})();
+
+(function(){
+  const oldToast = window.toast;
+  window.toast = function(msg,ms=2500){
+    try{ if(oldToast) oldToast(msg,ms); }catch(_){}
+    try{ if(navigator.vibrate) navigator.vibrate(30); }catch(_){}
+  };
+})();
+
+
+/* ===== UX + PERCEPTION FINAL ===== */
+
+// 1. Submit feedback (clear)
+(function(){
+  const oldToast = window.toast;
+  window.toast = function(msg,ms=2500){
+    try{
+      if(oldToast) oldToast(msg,ms);
+    }catch(e){}
+  };
+})();
+
+// 2. Enhance answer result clarity
+(function(){
+  const oldShow = window.showAnswerResult;
+  if(!oldShow) return;
+
+  window.showAnswerResult = function(correct, pts){
+    try{
+      if(correct === true){
+        toast("✔ ตอบถูก +" + pts + " แต้ม");
+      }else if(correct === false){
+        toast("❌ ตอบไม่ถูก");
+      }else{
+        toast("⏳ กำลังตรวจคำตอบ...");
+      }
+    }catch(e){}
+    return oldShow(correct, pts);
+  };
+})();
+
+// 3. Add rule hint once
+(function(){
+  setTimeout(()=>{
+    if(!localStorage.getItem("rule_hint_shown")){
+      toast("ℹ️ คะแนนคิดตามเวลาที่ระบบได้รับคำตอบ",4000);
+      localStorage.setItem("rule_hint_shown","1");
+    }
+  },3000);
+})();
+
+// 4. Prevent double click feeling
+(function(){
+  const btn = document.getElementById('btnActSubmit');
+  if(!btn) return;
+
+  btn.addEventListener('click', ()=>{
+    btn.style.opacity = "0.7";
+    setTimeout(()=>btn.style.opacity="1",1500);
+  });
+})();
+
+</script>
+
+<div id="redeemStatus" class="muted" style="margin-top:10px;display:none"></div>
 </body>
 </html>
