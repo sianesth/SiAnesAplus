@@ -83,7 +83,7 @@ button{ cursor:pointer; background:var(--btn); color:#fff; border-color:transpar
 button.ghost{ background:#0f1733; color:#fff }
 button[disabled]{ background:#cfd7ff; color:#6570a0; cursor:not-allowed }
 .muted{ color:var(--muted) }
-.pill{ display:inline-block; background:#eef3ff; border-radius:999px; padding:6px 12px }
+.pill{ display:inline-block; background:#fff5f5; border-radius:999px; padding:6px 12px }
 
 /* ========== Card ========== */
 .card{
@@ -955,8 +955,8 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
   
 <!-- ===== PRIVILEGE PATCH ===== -->
 <section id="privilegeBox" class="card" style="display:block">
-  <h3>🎟️ แลกสิทธิ์</h3>
-  <button id="btnPrivilegeOpen" class="kpiActionBtn">แต้มแลกสิทธิ์</button>
+  <h3>🎟️ แลกสิทธิ์ลุ้นโชค</h3>
+  <button id="btnPrivilegeOpen" class="kpiActionBtn">แลกสิทธิ์</button>
 <button id="btnMyPrivileges" class="kpiActionBtn">สิทธิ์ที่คุณแลก</button>
   <div id="privilegeList" style="margin-top:12px"></div>
 </section>
@@ -2386,7 +2386,7 @@ function renderRewards(){
       name,
       v,
       need: needOf(v),
-      stock: Number(v.stock ?? v.แลกสิทธิ์ทั้งหมด ?? 0) || 0
+      stock: Number(v.stock ?? v.สิทธิ์ถูกแลกไปแล้ว ?? 0) || 0
     }))
     .sort((a, b) => (b.need - a.need) || (b.stock - a.stock) || a.name.localeCompare(b.name, 'th'));
 
@@ -5237,7 +5237,7 @@ function getRolling3MonthLabel(){
 <div id="privilegeModal" class="modal" style="display:none">
   <div class="modal-card transfer-card">
     <div class="transfer-header">
-      <div class="transfer-title">🎟️ แลกสิทธิ์</div>
+      <div class="transfer-title">🎟️ แลกสิทธิ์ลุ้นโชค</div>
     </div>
 
     <div id="pvList" style="margin-top:8px"></div>
@@ -5301,7 +5301,10 @@ function getRolling3MonthLabel(){
   }
 
   function closePrivilegeModal(){
-    if (pvModal()) pvModal().style.display = 'none';
+    const m = pvModal();
+    if (!m) return;
+    m.classList.remove('show');
+    m.style.display = 'none';
   }
 
   function calcPrivilege(){
@@ -5353,7 +5356,7 @@ function getRolling3MonthLabel(){
           <div style="flex:1;min-width:0">
             <b>${esc(p.PrivilegeName)}</b>
             <div class="muted">${esc(p.Description || '')}</div>
-            <div class="pill">แลกสิทธิ์ทั้งหมด ${totalChange}</div>
+            <div class="pill">สิทธิ์ถูกแลกไปแล้ว = ${totalChange}</div>
           </div>
           <input type="number" min="0" max="${Math.max(0,totalChange)}" value="0"
                  data-pvid="${esc(p.PrivilegeID)}"
@@ -5395,13 +5398,37 @@ function getRolling3MonthLabel(){
     box.innerHTML = html + box.innerHTML;
   }
 
+
+  function showPrivilegeLoading(msg){
+    const box = document.getElementById('privilegeList');
+    if(!box) return;
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:14px;color:#6b78a6">${esc(msg || '⏳ กำลังโหลดรายการสิทธิ์...')}</div>
+      </div>
+    `;
+  }
+
+  function showPrivilegeError(msg){
+    const box = document.getElementById('privilegeList');
+    if(!box) return;
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="text-align:center;padding:16px">
+        <div class="bad" style="margin-bottom:8px">${esc(msg || 'โหลดข้อมูลสิทธิ์ไม่สำเร็จ')}</div>
+        <div class="muted">กรุณากด "สิทธิ์ที่คุณแลก" อีกครั้ง</div>
+      </div>
+    `;
+  }
+
   async function loadPrivilegeHistory(){
     const sap = String(localStorage.getItem('SAP') || (window.state && state.sap) || '').replace(/\D/g,'').trim();
     const box = document.getElementById('privilegeList');
     if(!box) return;
 
     if(!sap){
-      box.innerHTML = '<div class="muted" style="text-align:center;padding:12px">กรุณาเข้าสู่ระบบ</div>';
+      box.innerHTML = '<div class="muted" style="text-align:center;padding:12px">กรุณากด "สิทธิ์ที่คุณแลก" เพื่อดูรายการ</div>';
       return;
     }
 
@@ -5477,12 +5504,14 @@ function getRolling3MonthLabel(){
       return;
     }
     if(!pvConfirmText() || !pvConfirmBox()) return;
-    pvConfirmText().innerHTML = 'ยืนยันแลก ' + pvSelected.map(x => `${esc(x.name)} x${Number(x.qty||0)}`).join(', ')
+    pvConfirmText().innerHTML = 'ยืนยันแลกสิทธิ์ลุ้น ' + pvSelected.map(x => `${esc(x.name)} x${Number(x.qty||0)}`).join(', ')
       + `<div style="margin-top:6px">ใช้รวม <b>${total}</b> แต้ม</div>`;
     pvConfirmBox().style.display = 'block';
   }
 
   async function confirmPrivilege(){
+    if(confirmPrivilege._busy) return;
+
     const sap = localStorage.getItem('SAP') || '';
     const fullName = localStorage.getItem('FULLNAME') || '';
     const items = pvSelected.map(x => ({
@@ -5490,8 +5519,29 @@ function getRolling3MonthLabel(){
       name: x.name,
       qty: Number(x.qty||0),
       pointsPerRight: Number(x.pointsPerRight||0)
-    }));
+    })).filter(x => x.qty > 0);
+
+    if(!items.length){
+      if(typeof toast === 'function') toast('กรุณาเลือกสิทธิ์');
+      else alert('กรุณาเลือกสิทธิ์');
+      return;
+    }
+
+    confirmPrivilege._busy = true;
+    const btnConfirm = document.getElementById('btnPvConfirm');
+    const oldText = btnConfirm ? btnConfirm.textContent : '';
+
     try{
+      if(btnConfirm){
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'กำลังบันทึก...';
+      }
+
+      // ปิด popup และแสดง loading ทันที ลดความสับสนของผู้ใช้
+      closePrivilegeModal();
+      showPrivilegeLoading('⏳ กำลังโหลดรายการสิทธิ์...');
+      if(typeof toast === 'function') toast('กำลังบันทึกข้อมูล...', 1800);
+
       const r = await fetch(PRIV_API, {
         method:'POST',
         headers:{ 'Content-Type':'text/plain;charset=utf-8' },
@@ -5502,22 +5552,34 @@ function getRolling3MonthLabel(){
           items
         })
       });
+
       let j = {};
       try{ j = await r.json(); }catch(_){}
-      if(j && j.ok === false){
-        throw new Error(j.msg || j.error || 'redeem failed');
+
+      if(!r.ok || (j && j.ok === false)){
+        throw new Error((j && (j.msg || j.error)) || 'redeem failed');
       }
-      closePrivilegeModal();
+
+      // แสดงรายการแบบทันที แล้วตามด้วยโหลดข้อมูลจริง
       localRenderHistory(items);
-      if(typeof toast === 'function') toast('แลกสิทธิ์สำเร็จ');
-      loadPrivilegeHistory();
+      await loadPrivilegeHistory();
+
       try{
         if(typeof refreshUserSummary === 'function') refreshUserSummary(true);
       }catch(_){}
+
+      if(typeof toast === 'function') toast('แลกสิทธิ์สำเร็จ');
     }catch(err){
       console.error(err);
+      showPrivilegeError('โหลดข้อมูลสิทธิ์ไม่สำเร็จ');
       if(typeof toast === 'function') toast('แลกสิทธิ์ไม่สำเร็จ');
       else alert('แลกสิทธิ์ไม่สำเร็จ');
+    }finally{
+      if(btnConfirm){
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = oldText || 'ยืนยัน';
+      }
+      confirmPrivilege._busy = false;
     }
   }
 
@@ -5757,8 +5819,86 @@ setInterval(fixAllQtyInput,1000);
   });
 })();
 
+// ===== FINAL PATCH: ปิด popup ทันทีเมื่อกดยืนยัน =====
+(function(){
+
+  function closePrivilegeModal(){
+    const m = document.getElementById('privilegeModal');
+    if(!m) return;
+
+    m.classList.remove('show');
+    m.style.display = 'none';
+  }
+
+  // ⭐ ดักเฉพาะปุ่ม "ยืนยัน" ใน popup นี้เท่านั้น
+  document.addEventListener('click', function(e){
+
+    const btn = e.target;
+    if(!btn) return;
+
+    // ต้องเป็นปุ่ม "ยืนยัน"
+    const isConfirmBtn =
+      btn.tagName === 'BUTTON' &&
+      btn.textContent.trim() === 'ยืนยัน';
+
+    if(!isConfirmBtn) return;
+
+    // ต้องอยู่ใน modal แลกสิทธิ์
+    const modal = btn.closest('#privilegeModal');
+    if(!modal) return;
+
+    // ⭐ ปิดทันที (ไม่รอ backend)
+    closePrivilegeModal();
+
+  });
+
+})();
+
 </script>
 
 <div id="redeemStatus" class="muted" style="margin-top:10px;display:none"></div>
+
+<!-- ===== ENTERPRISE PRIVILEGE UX PATCH (SAFE) ===== -->
+<script>
+function showPrivilegeLoading(){
+  const box = document.getElementById('privilegeList');
+  if(!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<div style="text-align:center;padding:16px">⏳ กำลังโหลดรายการสิทธิ์...</div>';
+}
+
+function refreshPrivilegeRealtime(){
+  const btn = document.getElementById('btnMyPrivileges');
+  if(btn) btn.click();
+}
+
+let redeemLock = false;
+
+document.addEventListener('click', function(e){
+  const btn = e.target;
+  if(!btn) return;
+
+  const txt = (btn.textContent || '').trim();
+
+  if(!txt.includes('ยืนยัน')) return;
+
+  const modal = btn.closest('#privilegeModal');
+  if(!modal) return;
+
+  if(redeemLock) return;
+  redeemLock = true;
+
+  modal.classList.remove('show');
+  modal.style.display = 'none';
+
+  showPrivilegeLoading();
+
+  setTimeout(()=>{
+    refreshPrivilegeRealtime();
+    redeemLock = false;
+  },300);
+});
+</script>
+
 </body>
 </html>
