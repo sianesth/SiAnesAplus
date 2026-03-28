@@ -5504,7 +5504,7 @@ function getRolling3MonthLabel(){
       return;
     }
     if(!pvConfirmText() || !pvConfirmBox()) return;
-    pvConfirmText().innerHTML = 'ยืนยันแลกสิทธิ์ลุ้น ' + pvSelected.map(x => `${esc(x.name)} x${Number(x.qty||0)}`).join(', ')
+    pvConfirmText().innerHTML = 'ยืนยันแลกสิทธิ์ลุ้น : ' + pvSelected.map(x => `${esc(x.name)} x${Number(x.qty||0)}`).join(', ')
       + `<div style="margin-top:6px">ใช้รวม <b>${total}</b> แต้ม</div>`;
     pvConfirmBox().style.display = 'block';
   }
@@ -5897,6 +5897,70 @@ document.addEventListener('click', function(e){
     refreshPrivilegeRealtime();
     redeemLock = false;
   },300);
+});
+</script>
+
+
+<script>
+// ===== ENTERPRISE PATCH =====
+let __currentActId = '';
+let __submitting = false;
+
+// RTDB URL (auto from existing)
+const RTDB_URL = "https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+// ===== check answered from server =====
+async function hasAnsweredFromServer(sap, actId){
+  try{
+    const res = await fetch(`${RTDB_URL}/public/userLastSubmission/${sap}/${actId}.json`);
+    const data = await res.json();
+    return !!(data && data.answered);
+  }catch(e){
+    return false;
+  }
+}
+
+// ===== prevent popup globally =====
+const _origOpen = window.openActModal || function(){};
+window.openActModal = async function(){
+  try{
+    const sap = window.__userSAP || '';
+    if(await hasAnsweredFromServer(sap, __currentActId)){
+      console.log('⛔ skip popup (enterprise)');
+      return;
+    }
+  }catch(e){}
+  return _origOpen.apply(this, arguments);
+};
+
+// ===== prevent double submit =====
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'btnActNow'){
+    if(__submitting){
+      console.log('⛔ blocked duplicate click');
+      return;
+    }
+    __submitting = true;
+
+    setTimeout(()=>{
+      __submitting = false;
+    },1500);
+  }
+});
+
+// ===== loading UX =====
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'btnActNow'){
+    const btn = e.target;
+    btn.disabled = true;
+    const old = btn.innerText;
+    btn.innerText = 'กำลังส่ง...';
+
+    setTimeout(()=>{
+      btn.disabled = false;
+      btn.innerText = old;
+    },1500);
+  }
 });
 </script>
 
