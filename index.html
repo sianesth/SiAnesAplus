@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>ANESA+ — Session 1</title>
+<title>ANESA+ — Season 2 | Team Power</title>
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
 <style>
@@ -849,6 +849,117 @@ body.is-login main{
 }
 
 
+
+/* ===== SEASON 2 WELCOME / GROUP ROSTER PATCH ===== */
+#season2WelcomeBox{
+  display:none;
+  padding:18px 18px 20px;
+  background:linear-gradient(145deg,#ffffff,#f7fbff 55%,#fff7fb);
+  border:1px solid #e5ecff;
+  border-radius:24px;
+  box-shadow:0 16px 38px rgba(31,111,255,.08);
+}
+.season2-hero{
+  text-align:center;
+  padding:8px 6px 12px;
+}
+.season2-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:6px 14px;
+  border-radius:999px;
+  background:#eef4ff;
+  color:#315ab8;
+  font-weight:800;
+  font-size:13px;
+  margin-bottom:10px;
+}
+.season2-title{
+  margin:0;
+  font-size:clamp(20px,4.8vw,30px);
+  font-weight:900;
+  line-height:1.35;
+  color:#0f1733;
+}
+.season2-group-name{
+  color:#1f6fff;
+  white-space:normal;
+}
+.season2-subtitle{
+  margin:10px 0 0;
+  font-size:clamp(15px,3.6vw,18px);
+  font-weight:800;
+  color:#7a4c9d;
+}
+#season2Roster{
+  margin:10px auto 0;
+  width:min(620px,100%);
+  border:1px solid #dfe7f6;
+  border-radius:18px;
+  overflow:hidden;
+  background:rgba(255,255,255,.9);
+  box-shadow:0 8px 22px rgba(15,23,51,.05);
+}
+.season2-member{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:9px 12px;
+  border-bottom:1px dashed #dfe7f6;
+  background:rgba(255,255,255,.92);
+}
+.season2-member:last-child{ border-bottom:none; }
+.season2-member-no{
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:#f3f7ff;
+  color:#315ab8;
+  font-size:clamp(12px,3vw,15px);
+  font-weight:900;
+}
+.season2-member-name{
+  flex:1;
+  min-width:0;
+  font-weight:900;
+  font-size:clamp(14px,3.6vw,18px);
+  line-height:1.35;
+  color:#071637;
+  overflow-wrap:anywhere;
+}
+.season2-member-type{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:96px;
+  padding:3px 12px;
+  border-radius:999px;
+  background:#edf2ff;
+  color:#315ab8;
+  font-size:clamp(12px,3.2vw,16px);
+  font-weight:500;
+}
+.season2-empty{
+  text-align:center;
+  color:#6b78a6;
+  padding:16px;
+  background:#f8fbff;
+}
+@media(max-width:520px){
+  #season2WelcomeBox{ padding:16px 12px 18px; border-radius:20px; }
+  .season2-member{ padding:8px 10px; gap:8px; }
+  .season2-member-no{ flex-basis:30px; width:30px; height:30px; }
+  .season2-member-type{ min-width:86px; padding:2px 10px; }
+}
+
 </style>
 
 
@@ -862,6 +973,206 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
 #redeemStatus{font-weight:600;transition:all .2s ease;}
 </style>
 
+
+
+<!-- ===== SEASON 2 FORCE HIDE: Activity + LOTTO ===== -->
+<style>
+  body.season2-mode #actTodayCard,
+  body.season2-mode #lottoCard{
+    display:none !important;
+    visibility:hidden !important;
+  }
+</style>
+
+<style>
+
+/* ===== SEASON 2 GEN Z MODERN THEME PATCH =====
+   Concept: Team Power / Generation Mix / Modern pastel gradient
+   Scope: visual theme only — no original structure or data logic changed
+*/
+:root{
+  --bg:#f8fbff;
+  --card:rgba(255,255,255,.78);
+  --line:rgba(140,160,255,.20);
+  --txt:#10172f;
+  --muted:#69739f;
+  --btn:#6c5ce7;
+  --danger:#ff5d7a;
+  --ok:#14b8a6;
+  --bd:rgba(147,197,253,.25);
+  --shadow:0 20px 60px rgba(82,97,255,.13), 0 6px 18px rgba(17,24,39,.06);
+  --s2-blue:#2563eb;
+  --s2-violet:#7c3aed;
+  --s2-pink:#ec4899;
+  --s2-cyan:#06b6d4;
+  --s2-lime:#84cc16;
+  --s2-orange:#fb923c;
+}
+html,body{ min-height:100%; }
+body,
+body.is-login{
+  background:
+    radial-gradient(circle at 12% 10%, rgba(125,92,255,.26) 0, transparent 28%),
+    radial-gradient(circle at 88% 14%, rgba(6,182,212,.22) 0, transparent 30%),
+    radial-gradient(circle at 20% 92%, rgba(236,72,153,.18) 0, transparent 28%),
+    linear-gradient(135deg,#f7fbff 0%,#f7f4ff 45%,#fff7fb 100%) !important;
+  color:var(--txt);
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+  background-image:
+    linear-gradient(rgba(37,99,235,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,.04) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.08));
+}
+header{
+  background:rgba(255,255,255,.74) !important;
+  color:#10172f !important;
+  border-bottom:1px solid rgba(147,197,253,.30);
+  box-shadow:0 12px 32px rgba(37,99,235,.10);
+  backdrop-filter:blur(18px) saturate(160%);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+}
+.brand .sys{
+  color:#10172f;
+  background:linear-gradient(90deg,#2563eb,#7c3aed,#ec4899);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.brand .welcome{ color:#5864a6 !important; }
+#btnLogout.icon-btn{
+  background:linear-gradient(135deg,#7c3aed,#ec4899,#fb923c) !important;
+  color:#fff;
+  box-shadow:0 12px 28px rgba(236,72,153,.22);
+}
+.card,
+.login-card,
+#season2WelcomeBox{
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(147,197,253,.26) !important;
+  box-shadow:var(--shadow) !important;
+  backdrop-filter:blur(18px) saturate(150%);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+}
+.login-card,
+#season2WelcomeBox{
+  border-radius:32px !important;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.88),rgba(239,246,255,.68) 48%,rgba(253,242,248,.70)) !important;
+}
+.login-logo{
+  filter:drop-shadow(0 18px 26px rgba(124,58,237,.20));
+}
+.login-title,
+.season2-title{
+  letter-spacing:-.02em;
+  color:#10172f;
+}
+.login-sub,
+.season2-subtitle{
+  color:#6d5bc7 !important;
+}
+#sap,
+input{
+  background:rgba(255,255,255,.88) !important;
+  border:1px solid rgba(99,102,241,.20) !important;
+  color:#10172f;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 8px 18px rgba(99,102,241,.08);
+}
+#sap:focus,
+input:focus{
+  outline:none;
+  border-color:rgba(124,58,237,.50) !important;
+  box-shadow:0 0 0 5px rgba(124,58,237,.13), 0 12px 24px rgba(99,102,241,.10) !important;
+}
+button,
+#btnLogin,
+.kpiActionBtn{
+  background:linear-gradient(135deg,#2563eb 0%,#7c3aed 55%,#ec4899 100%) !important;
+  color:#fff !important;
+  border:none !important;
+  box-shadow:0 14px 30px rgba(99,102,241,.22) !important;
+  transition:transform .18s ease, filter .18s ease, box-shadow .18s ease;
+}
+button:hover,
+#btnLogin:hover,
+.kpiActionBtn:hover{
+  transform:translateY(-2px);
+  filter:saturate(1.08) brightness(1.03);
+  box-shadow:0 18px 36px rgba(124,58,237,.26) !important;
+}
+button[disabled]{
+  background:linear-gradient(135deg,#dbeafe,#ede9fe) !important;
+  color:#64748b !important;
+  box-shadow:none !important;
+}
+button.ghost{
+  background:rgba(15,23,42,.82) !important;
+  color:#fff !important;
+}
+.season2-badge{
+  background:linear-gradient(135deg,rgba(37,99,235,.12),rgba(236,72,153,.12),rgba(6,182,212,.12)) !important;
+  color:#3152b7 !important;
+  border:1px solid rgba(124,58,237,.14);
+  box-shadow:0 10px 24px rgba(124,58,237,.10);
+}
+.season2-group-name{
+  background:linear-gradient(90deg,#2563eb,#7c3aed,#ec4899);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+#season2Roster{
+  border:1px solid rgba(147,197,253,.32) !important;
+  border-radius:24px !important;
+  overflow:hidden;
+  background:rgba(255,255,255,.72) !important;
+  box-shadow:0 18px 42px rgba(37,99,235,.10) !important;
+}
+.season2-member{
+  min-height:54px;
+  background:rgba(255,255,255,.78) !important;
+  border-bottom:1px dashed rgba(99,102,241,.18) !important;
+}
+.season2-member:nth-child(6n+1) .season2-member-no{ background:#dbeafe; color:#2563eb; }
+.season2-member:nth-child(6n+2) .season2-member-no{ background:#ede9fe; color:#7c3aed; }
+.season2-member:nth-child(6n+3) .season2-member-no{ background:#fce7f3; color:#db2777; }
+.season2-member:nth-child(6n+4) .season2-member-no{ background:#cffafe; color:#0891b2; }
+.season2-member:nth-child(6n+5) .season2-member-no{ background:#ecfccb; color:#65a30d; }
+.season2-member:nth-child(6n) .season2-member-no{ background:#ffedd5; color:#ea580c; }
+.season2-member-no{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 8px 16px rgba(15,23,42,.06);
+}
+.season2-member-name{
+  color:#10172f !important;
+  letter-spacing:-.01em;
+}
+.season2-member-type{
+  background:linear-gradient(135deg,rgba(219,234,254,.95),rgba(237,233,254,.95)) !important;
+  color:#3152b7 !important;
+  border:1px solid rgba(99,102,241,.14);
+  font-weight:800 !important;
+}
+.season2-empty{
+  background:rgba(248,250,255,.78) !important;
+  color:#69739f !important;
+}
+footer{
+  color:#7580aa !important;
+}
+@media(max-width:520px){
+  main{ padding:12px; gap:14px; }
+  .login-card,#season2WelcomeBox{ border-radius:26px !important; }
+  .season2-member{ min-height:50px; }
+  .season2-member-type{ min-width:78px; font-size:12px; }
+}
+</style>
 </head>
 <body class="is-login">
 <header>
@@ -886,8 +1197,8 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
   <section id="loginBox">
     <div class="login-card">
       <img src="logo3.png" alt="Mascot" class="login-logo" />
-      <h1 class="login-title">เข้าสู่ระบบ Anesthesia A+<br>ตอน “ล่าทิ้ว...บิ้วแต้ม”</h1>
-      <p class="login-sub">ใส่รหัส <b>SAP</b> ของคุณ เพื่อเริ่มสะสมแต้มและแลกรางวัล</p>
+      <h1 class="login-title">เข้าสู่ระบบ Anesthesia A+<br>“🪄Season 2: Team Power✨”</h1>
+      <p class="login-sub">ใส่รหัส <b>SAP</b> เพื่อเข้าสู่ทีมของคุณ</p>
       <div class="login-row">
         <input id="sap" placeholder="SAP" inputmode="numeric" autocomplete="off" />
         <button id="btnLogin">เข้าสู่ระบบ</button>
@@ -895,6 +1206,18 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
       <div id="loginMsg" class="muted" style="margin-top:8px;min-height:20px"></div>
     </div>
 </section>
+
+  <!-- Season 2 Welcome / Group roster -->
+  <section id="season2WelcomeBox" class="card" style="display:none">
+    <div class="season2-hero">
+      <div class="season2-badge">🪄 ANESA+ Season 2 · Team Power ✨</div>
+      <h2 class="season2-title">ยินดีต้อนรับคุณเข้าสู่กลุ่ม <span id="season2GroupName" class="season2-group-name">—</span></h2>
+      <div class="season2-subtitle">โดยมีเพื่อนสมาชิกที่น่ารักของคุณคือ</div>
+    </div>
+    <div id="season2Roster" aria-live="polite">
+      <div class="season2-empty">กำลังโหลดรายชื่อสมาชิกในกลุ่ม...</div>
+    </div>
+  </section>
 
   <!-- KPI + Top20 -->
   <section id="kpiBox" class="card" style="display:none">
@@ -954,7 +1277,7 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
   <!-- Rewards -->
   
 <!-- ===== PRIVILEGE PATCH ===== -->
-<section id="privilegeBox" class="card" style="display:block">
+<section id="privilegeBox" class="card" style="display:none">
   <h3>🎟️ แลกสิทธิ์ลุ้นโชค</h3>
   <button id="btnPrivilegeOpen" class="kpiActionBtn">แลกสิทธิ์</button>
 <button id="btnMyPrivileges" class="kpiActionBtn">สิทธิ์ที่คุณแลก</button>
@@ -1126,7 +1449,7 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
 
 <script>
   /* ========= Global ========= */
-  const APP_VERSION = "2026-03-22";  
+  const APP_VERSION = "2026-05-08-season2-genz";  
 
   (function hardVersionGate(){
     try{
@@ -1239,7 +1562,7 @@ const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL :
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 1.2.4 by Zuree.Yoo</span>
+  <span style="font-size:10px;opacity:.85">Version 0.0.0 Season 2 </span>
 </footer>
 
 <script type="module">
@@ -1805,6 +2128,206 @@ let state = {
   formTitles: {}       // ข้อมูลจาก FormTitles (map formId -> row)
 };
 
+
+
+// ===== SEASON 2 MODE PATCH =====
+const SEASON2_MODE = true;
+const SEASON2_HIDDEN_BLOCKS = [
+  'kpiBox','actTodayCard','lottoCard','privilegeBox','rewardsBox','historyBox',
+  'weeklyBox','annualBox','transferCard','adminReset'
+];
+const SEASON2_TYPE_ORDER = ['Staff','Staffnurse','Officer','PharmaAss','Research'];
+const SEASON2_SPREADSHEET_ID = '1e0k2_H38renST6ERAwUbnPEm6hzJGMtMOvAD81D6lOk';
+
+function getAnyField(obj, names){
+  if (!obj || typeof obj !== 'object') return '';
+  for (const n of names){
+    if (obj[n] !== undefined && obj[n] !== null && String(obj[n]).trim() !== '') return obj[n];
+  }
+  const lowerMap = {};
+  Object.keys(obj).forEach(k => lowerMap[String(k).toLowerCase()] = k);
+  for (const n of names){
+    const k = lowerMap[String(n).toLowerCase()];
+    if (k && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '') return obj[k];
+  }
+  return '';
+}
+function normalizeGroupNo(v){ return String(v ?? '').normalize('NFKC').trim(); }
+function groupMatchKey(v){
+  const s = normalizeGroupNo(v).toLowerCase().replace(/\s+/g,'');
+  const m = s.match(/(?:^g|group)?0*(\d+)$/i);
+  return m ? String(Number(m[1])) : s;
+}
+function normalizeType(v){ return String(v ?? '').normalize('NFKC').trim(); }
+function season2TypeRank(v){
+  const t = normalizeType(v).toLowerCase();
+  const i = SEASON2_TYPE_ORDER.findIndex(x => x.toLowerCase() === t);
+  return i >= 0 ? i : 999;
+}
+function hideSeason2Blocks(){
+  SEASON2_HIDDEN_BLOCKS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+}
+function showSeason2Shell(){
+  document.body.classList.add('season2-mode');
+  document.body.classList.remove('is-login');
+  const login = document.getElementById('loginBox'); if (login) login.style.display = 'none';
+  const logout = document.getElementById('btnLogout'); if (logout) logout.style.display = 'inline-block';
+  const box = document.getElementById('season2WelcomeBox'); if (box) box.style.display = 'block';
+  hideSeason2Blocks();
+}
+async function season2FetchJSON(path){
+  try{
+    const r = await fetch(`${DB_URL}/${path}.json?t=${Date.now()}`, { cache:'no-store' });
+    if (!r.ok) return null;
+    return await r.json();
+  }catch(_){ return null; }
+}
+function objectRows(obj){
+  if (!obj) return [];
+  if (Array.isArray(obj)) return obj.filter(Boolean);
+  if (typeof obj === 'object') return Object.keys(obj).map(k => {
+    const v = obj[k];
+    return (v && typeof v === 'object') ? { _key:k, ...v } : { _key:k, value:v };
+  });
+  return [];
+}
+
+function season2FetchSheetRows(sheetName){
+  return new Promise((resolve)=>{
+    const cb = 'season2_sheet_cb_' + Math.random().toString(36).slice(2);
+    const timer = setTimeout(()=>{ cleanup(); resolve([]); }, 5500);
+    function cleanup(){
+      try{ clearTimeout(timer); }catch(_){ }
+      try{ delete window[cb]; }catch(_){ }
+      try{ script.remove(); }catch(_){ }
+    }
+    window[cb] = (payload)=>{
+      try{
+        const table = payload && payload.table;
+        const cols = (table && table.cols || []).map((c,i)=> String(c.label || c.id || ('COL'+i)).trim());
+        const rows = (table && table.rows || []).map(r=>{
+          const o = {};
+          (r.c || []).forEach((cell,i)=>{
+            const key = cols[i] || ('COL'+i);
+            o[key] = cell ? (cell.v ?? cell.f ?? '') : '';
+          });
+          return o;
+        });
+        cleanup(); resolve(rows);
+      }catch(e){ cleanup(); resolve([]); }
+    };
+    const tqx = 'responseHandler:' + cb;
+    const url = `https://docs.google.com/spreadsheets/d/${SEASON2_SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&headers=1&tqx=${encodeURIComponent(tqx)}&t=${Date.now()}`;
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = ()=>{ cleanup(); resolve([]); };
+    document.body.appendChild(script);
+  });
+}
+
+function mergeRowsBySap(baseRows, addRows){
+  const map = new Map();
+  for (const src of [baseRows || [], addRows || []]){
+    for (const r of src){
+      const sap = String(getAnyField(r, ['SAP','Sap','sap','รหัส','รหัส SAP','_key','UserID','userId'])).trim();
+      if (!sap) continue;
+      const old = map.get(sap) || {};
+      const merged = { ...old };
+      for (const [k,v] of Object.entries(r)){
+        if (v !== undefined && v !== null && String(v).trim() !== '') merged[k] = v;
+      }
+      merged.SAP = merged.SAP || sap;
+      map.set(sap, merged);
+    }
+  }
+  return Array.from(map.values());
+}
+async function loadSeason2Users(){
+  // Season 2 ใช้ Users sheet เป็นหลัก เพื่อให้ได้ Name + Type ครบถ้วน
+  const sheetRows = await season2FetchSheetRows('Users');
+
+  const paths = ['public/users','public/Users','public/usersSummary','public/UsersSummary'];
+  let fbRows = [];
+  const map = new Map();
+  for (const p of paths){
+    const obj = await season2FetchJSON(p);
+    const rows = objectRows(obj);
+    for (const r of rows){
+      const sap = String(getAnyField(r, ['SAP','Sap','sap','_key','UserID','userId'])).trim();
+      if (!sap) continue;
+      const old = map.get(sap) || {};
+      const merged = { ...old };
+      for (const [k,v] of Object.entries(r)){
+        if (v !== undefined && v !== null && String(v).trim() !== '') merged[k] = v;
+      }
+      merged.SAP = merged.SAP || sap;
+      map.set(sap, merged);
+    }
+  }
+  fbRows = Array.from(map.values());
+
+  // merge โดยให้ค่าจาก Users sheet ทับค่าเดิม เพื่อแก้ Type เป็น '-' จาก Firebase
+  return mergeRowsBySap(fbRows, sheetRows);
+}
+async function loadSeason2Groups(){
+  const sheetRows = await season2FetchSheetRows('UserGroups');
+  if (sheetRows && sheetRows.length) return sheetRows;
+  const paths = ['public/UserGroups','public/userGroups','public/groups','UserGroups'];
+  for (const p of paths){
+    const obj = await season2FetchJSON(p);
+    const rows = objectRows(obj);
+    if (rows.length) return rows;
+  }
+  return [];
+}
+async function renderSeason2Welcome(currentUser){
+  const rosterBox = document.getElementById('season2Roster');
+  const groupEl = document.getElementById('season2GroupName');
+  if (rosterBox) rosterBox.innerHTML = '<div class="season2-empty">กำลังโหลดรายชื่อสมาชิกในกลุ่ม...</div>';
+
+  let users = await loadSeason2Users();
+  const sap = String(state.sap || localStorage.getItem('SAP') || '').trim();
+  const me = users.find(u => String(getAnyField(u, ['SAP','Sap','sap','_key'])).trim() === sap) || currentUser || {};
+  const myGroupNo = normalizeGroupNo(getAnyField(me, ['GroupNumber','groupNumber','GroupNo','groupNo','Group','group']));
+  const myGroupKey = groupMatchKey(myGroupNo);
+
+  if (!users.length && currentUser){ users = [currentUser]; }
+
+  const groups = await loadSeason2Groups();
+  const groupRow = groups.find(g => groupMatchKey(getAnyField(g, ['GroupNumber','groupNumber','GroupNo','groupNo','Group','group','_key'])) === myGroupKey);
+  const groupName = String(getAnyField(groupRow, ['GroupName','groupName','Name','name']) || myGroupNo || '—').trim();
+  if (groupEl) groupEl.textContent = groupName || '—';
+
+  let members = users.filter(u => groupMatchKey(getAnyField(u, ['GroupNumber','groupNumber','GroupNo','groupNo','Group','group'])) === myGroupKey);
+  if (!members.length && me && Object.keys(me).length) members = [me];
+
+  members.sort((a,b) => {
+    const ta = getAnyField(a, ['Type','type','Role','role']);
+    const tb = getAnyField(b, ['Type','type','Role','role']);
+    const ra = season2TypeRank(ta), rb = season2TypeRank(tb);
+    if (ra !== rb) return ra - rb;
+    return String(getAnyField(a, ['name','Name','FullName','fullName']) || '').localeCompare(String(getAnyField(b, ['name','Name','FullName','fullName']) || ''), 'th');
+  });
+
+  if (!rosterBox) return;
+  if (!members.length){
+    rosterBox.innerHTML = '<div class="season2-empty">ยังไม่พบรายชื่อสมาชิกในกลุ่มนี้</div>';
+    return;
+  }
+  rosterBox.innerHTML = members.map((u, idx) => {
+    let rawName = String(getAnyField(u, ['Name','name','FullName','fullName','Fullname','NAME','ชื่อ','ชื่อ-นามสกุล']) || getAnyField(u, ['SAP','sap','_key']) || '-').trim();
+    // กันชื่อที่เคยถูกต่อท้ายกลุ่ม เช่น "ชื่อ (g.1)" ให้เหลือเฉพาะชื่อจริง
+    rawName = rawName.replace(/\s*\((?:g|G|group|Group)\.?\s*\d+\)\s*$/i, '').trim();
+    const name = escapeHtml(rawName || '-');
+    const type = escapeHtml(getAnyField(u, ['Type','type','TYPE','Role','role','Position','position','ตำแหน่ง']) || '-');
+    return `<div class="season2-member">
+      <span class="season2-member-no">${idx + 1}</span>
+      <div class="season2-member-name">${name}</div>
+      <span class="season2-member-type">${type}</span>
+    </div>`;
+  }).join('');
+}
+
 let fb=null; let actIndex={};
 let _submitting = false;
 
@@ -1960,6 +2483,12 @@ if (!ok && rawStatus !== ''){
   setWelcome(state.name);
   localStorage.setItem('SAP', sap);
   try{ localStorage.setItem('anes.session.v1', JSON.stringify({sap: state.sap, name: state.name})); }catch{}
+
+  if (SEASON2_MODE){
+    showSeason2Shell();
+    renderSeason2Welcome({ _key:sap, SAP:sap, ...u });
+    return;
+  }
 
   document.body.classList.remove('is-login');
   document.querySelector('#loginBox').style.display = 'none';
@@ -2242,7 +2771,8 @@ async function attachRealtime(){
 
   state.total = Number(v.pointsTotal||v.PointsTotal||0);
 
-  ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
+  if (SEASON2_MODE){ hideSeason2Blocks(); }
+  else ['kpiBox','actTodayCard','rewardsBox','historyBox','weeklyBox']
     .forEach(id=>$('#'+id).style.display='block');
 
   const earned = Number(v.pointsEarned||v.PointsEarned||0);
@@ -4838,7 +5368,27 @@ rows = rows.filter(r => {
 }
 
 /* ========= Auto restore ========= */
-(function restoreSession(){ const sess=readSession(); if(!sess||!sess.sap) return; state.sap=sess.sap; state.name=sess.name||sess.sap; setWelcome(state.name); document.body.classList.remove('is-login'); $('#loginBox').style.display='none'; $('#btnLogout').style.display='inline-block'; $('#actTodayCard').style.display='block'; renderLatest(readLatestCache()); clearAutoPopupFlags(); attachRealtime(); autoOpenOnceIfAvailable(true); scheduleAutoPopup(); })();
+(function restoreSession(){
+  const sess=readSession();
+  if(!sess||!sess.sap) return;
+  state.sap=sess.sap;
+  state.name=sess.name||sess.sap;
+  setWelcome(state.name);
+  if (SEASON2_MODE){
+    showSeason2Shell();
+    renderSeason2Welcome({ _key:state.sap, SAP:state.sap, name:state.name });
+    return;
+  }
+  document.body.classList.remove('is-login');
+  $('#loginBox').style.display='none';
+  $('#btnLogout').style.display='inline-block';
+  $('#actTodayCard').style.display='block';
+  renderLatest(readLatestCache());
+  clearAutoPopupFlags();
+  attachRealtime();
+  autoOpenOnceIfAvailable(true);
+  scheduleAutoPopup();
+})();
 
 /* ========= Heartbeat ========= */
 setInterval(()=>{ if(!state.sap) return; try{ if(!actOpen){ checkActivity(); autoOpenOnceIfAvailable(); } }catch{} }, 5000);
