@@ -2137,7 +2137,9 @@ const SEASON2_HIDDEN_BLOCKS = [
   'weeklyBox','annualBox','transferCard','adminReset'
 ];
 const SEASON2_TYPE_ORDER = ['Staff','Staffnurse','Officer','PharmaAss','Research'];
-const SEASON2_SPREADSHEET_ID = '1e0k2_H38renST6ERAwUbnPEm6hzJGMtMOvAD81D6lOk';
+// ใช้ Spreadsheet หลักของ Season 2 ที่ผู้ดูแลแก้ไขอยู่จริง
+// หน้า roster จะอ่าน Users!Name และ Users!GroupNumber จากไฟล์นี้ทุกครั้งที่เปิดหน้า
+const SEASON2_SPREADSHEET_ID = '1tm4_uleSPsMVy6qiv5QycSDnakYQQ5yLYaYNcwerY0w';
 
 function getAnyField(obj, names){
   if (!obj || typeof obj !== 'object') return '';
@@ -2242,32 +2244,56 @@ function mergeRowsBySap(baseRows, addRows){
   }
   return Array.from(map.values());
 }
-async function loadSeason2Users(){
-  // Season 2 ใช้ Users sheet เป็นหลัก เพื่อให้ได้ Name + Type ครบถ้วน
-  const sheetRows = await season2FetchSheetRows('Users');
+function season2IsActiveUser(row){
+  const raw = String(getAnyField(row, ['Status','status','Active','active']) ?? '').trim().toLowerCase();
+  // ไม่มีค่า Status ให้คงพฤติกรรมเดิมไว้ (แสดงชื่อได้)
+  if (!raw) return true;
+  return !['non-active','nonactive','inactive','false','0','off','disabled','ปิดใช้งาน','ไม่ใช้งาน'].includes(raw);
+}
 
+function season2UsersFromSheet(rows){
+  // Users sheet คือ source of truth สำหรับรายชื่อและกลุ่ม
+  // ไม่ merge ชื่อ/GroupNumber จาก Firebase เพราะ snapshot อาจค้างหรือเป็นข้อมูลจากไฟล์เก่า
+  const bySap = new Map();
+  for (const row of (rows || [])){
+    const sap = String(getAnyField(row, ['SAP','Sap','sap','รหัส','รหัส SAP','UserID','userId'])).trim();
+    const name = String(getAnyField(row, ['Name','name','FullName','fullName','Fullname','NAME','ชื่อ','ชื่อ-นามสกุล'])).trim();
+    const groupNumber = normalizeGroupNo(getAnyField(row, ['GroupNumber','groupNumber','Group No','GroupNo','groupNo','Group','group','กลุ่ม']));
+    if (!sap || !name || !groupNumber || !season2IsActiveUser(row)) continue;
+
+    // เก็บเฉพาะ fields จาก Users ที่หน้า roster ต้องใช้ เพื่อไม่ให้ Firebase เขียนทับภายหลัง
+    bySap.set(sap, {
+      _key: sap,
+      SAP: sap,
+      Name: name,
+      GroupNumber: groupNumber,
+      Type: String(getAnyField(row, ['Type','type','TYPE','Role','role','Position','position','ตำแหน่ง']) || '').trim(),
+      Status: String(getAnyField(row, ['Status','status','Active','active']) || '').trim()
+    });
+  }
+  return Array.from(bySap.values());
+}
+
+async function loadSeason2Users(){
+  // อ่าน Users sheet โดยตรงทุกครั้ง: Name + GroupNumber จึงตรงกับหน้า Users ปัจจุบัน
+  const sheetRows = await season2FetchSheetRows('Users');
+  const usersFromSheet = season2UsersFromSheet(sheetRows);
+  if (usersFromSheet.length) return usersFromSheet;
+
+  // Fallback เฉพาะเมื่อ Google Sheet อ่านไม่ได้ชั่วคราวเท่านั้น
+  // เพื่อให้ผู้ใช้ยังเข้าได้ แต่จะไม่ใช้ Firebase ถ้า Users อ่านได้ปกติ
   const paths = ['public/users','public/Users','public/usersSummary','public/UsersSummary'];
-  let fbRows = [];
-  const map = new Map();
+  const bySap = new Map();
   for (const p of paths){
-    const obj = await season2FetchJSON(p);
-    const rows = objectRows(obj);
+    const rows = objectRows(await season2FetchJSON(p));
     for (const r of rows){
       const sap = String(getAnyField(r, ['SAP','Sap','sap','_key','UserID','userId'])).trim();
-      if (!sap) continue;
-      const old = map.get(sap) || {};
-      const merged = { ...old };
-      for (const [k,v] of Object.entries(r)){
-        if (v !== undefined && v !== null && String(v).trim() !== '') merged[k] = v;
-      }
-      merged.SAP = merged.SAP || sap;
-      map.set(sap, merged);
+      if (!sap || !season2IsActiveUser(r)) continue;
+      const old = bySap.get(sap) || {};
+      bySap.set(sap, { ...old, ...r, SAP: sap });
     }
   }
-  fbRows = Array.from(map.values());
-
-  // merge โดยให้ค่าจาก Users sheet ทับค่าเดิม เพื่อแก้ Type เป็น '-' จาก Firebase
-  return mergeRowsBySap(fbRows, sheetRows);
+  return Array.from(bySap.values());
 }
 async function loadSeason2Groups(){
   const sheetRows = await season2FetchSheetRows('UserGroups');
