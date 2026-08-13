@@ -2186,7 +2186,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.0 • Release 2026-06-30</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.1</span>
 </footer>
 
 <script type="module">
@@ -6635,17 +6635,41 @@ function _annualCanonGroup_(v){
   if(!m) return s;
   return 'G'+String(Number(m[1])).padStart(2,'0');
 }
+function _annualParseDate_(value){
+  var s=_annualText_(value);
+  if(!s) return null;
+  var d=null, m;
+
+  // ISO / Firebase timestamp เช่น 2026-07-07T01:48:04.889Z หรือ 2026-07-07 08:46:03
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
+    d=new Date(s.replace(' ','T'));
+    return (d && !isNaN(d.getTime())) ? d : null;
+  }
+
+  // Thai/Sheet display: DD/MM/YYYY, DD/MM/พ.ศ. หรือ D/M/YYYY HH:mm:ss
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(m){
+    var y=Number(m[3]);
+    if(y>2400) y-=543;
+    if(y<100) y+=2000;
+    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
+    return (d && !isNaN(d.getTime())) ? d : null;
+  }
+
+  d=new Date(s);
+  return (d && !isNaN(d.getTime())) ? d : null;
+}
 function _annualDateText_(value){
   var s=_annualText_(value);
   if(!s) return '—';
-  var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  var d;
-  if(m){
-    var y=Number(m[3]); if(y>2400) y-=543; if(y<100) y+=2000;
-    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
-  }else d=new Date(s);
-  if(!d || isNaN(d.getTime())) return s;
+  var d=_annualParseDate_(s);
+  if(!d) return s;
   return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+(d.getFullYear()+543);
+}
+function _annualRowTime_(r){
+  var raw=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||r.AppliedAt||r.appliedAt||r.GroupPointAppliedAt||r.groupPointAppliedAt||'';
+  var d=_annualParseDate_(raw);
+  return d ? d.getTime() : 0;
 }
 function _annualToRows_(value){
   if(!value) return [];
@@ -6670,9 +6694,10 @@ function renderAnnual(){
     if(!seen[key]){ seen[key]=true; rows.push(r); }
   });
   rows.sort(function(a,b){
-    var da=new Date(a.Timestamp||a.timestamp||a.AwardedAt||a.awardedAt||0).getTime()||0;
-    var db=new Date(b.Timestamp||b.timestamp||b.AwardedAt||b.awardedAt||0).getTime()||0;
-    return db-da;
+    var db=_annualRowTime_(b);
+    var da=_annualRowTime_(a);
+    if(db!==da) return db-da; // วันที่ล่าสุดก่อน
+    return _annualText_(b.Title||b.title||b.FormTitle||b.formTitle).localeCompare(_annualText_(a.Title||a.title||a.FormTitle||a.formTitle),'th');
   });
   tbody.innerHTML=rows.length ? rows.map(function(r){
     var date=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||'';
