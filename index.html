@@ -2186,7 +2186,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.1</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.2</span>
 </footer>
 
 <script type="module">
@@ -5574,6 +5574,7 @@ const pk = pairKeyOf(act);
     try {
       /* STEP 1: wait for the Google Sheet receipt. No optimistic answer,
          no queue, and no Firebase write happens before this succeeds. */
+      // UX hard limit is enforced inside postSubmissionToSheet: failure returns within 1 minute.
       const res = await postSubmissionToSheet(payload);
 
       if (!res || !res.ok) {
@@ -7682,6 +7683,14 @@ try{
     if(!sap || !actId) return {ok:false, error:'missing sap or actId'};
     if(__anesaSheetSubmitBusy) return {ok:false, error:'sending'};
 
+    /*
+     * SS2 UX PATCH 2026-08-25
+     * Hard confirmation budget: 58 seconds.
+     * Keeps Sheet-first + duplicate protection, but never lets the UI wait 2-3 minutes.
+     */
+    const hardDeadlineAt = Date.now() + 58000;
+    const remainingMs = () => Math.max(0, hardDeadlineAt - Date.now());
+
     const day = submitDayKey_();
     const pendingKey = `ans_pending:${day}:${sap}:${actId}`;
     const finalKey = `ans:${day}:${sap}:${actId}`;
@@ -7707,45 +7716,83 @@ try{
       client:String((payload && payload.client) || 'web-anesa+')
     });
 
-    const postOnce = function(timeoutMs){
-      return fetchJSONWithTimeout_(url, {
+    const hardFetch = function(body, wantedTimeoutMs){
+      const left = remainingMs();
+      if(left <= 0) return Promise.resolve({ok:false, error:'CLIENT_CONFIRM_TIMEOUT_60S'});
+      const timeoutMs = Math.max(250, Math.min(Number(wantedTimeoutMs || 4000), left));
+
+      const fetchPromise = fetchJSONWithTimeout_(url, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(request),
+        body:JSON.stringify(body),
         cache:'no-store',
         keepalive:false
       }, timeoutMs);
+
+      const hardTimer = new Promise(resolve => {
+        setTimeout(() => resolve({ok:false, error:'timeout'}), timeoutMs + 80);
+      });
+      return Promise.race([fetchPromise, hardTimer]);
+    };
+
+    const sleepWithinDeadline = async function(ms){
+      const left = remainingMs();
+      if(left <= 0) return false;
+      await new Promise(resolve => setTimeout(resolve, Math.min(ms, left)));
+      return remainingMs() > 0;
+    };
+
+    const readReceiptFast = async function(){
+      const raw = await hardFetch({
+        action:'submission:receipt',
+        sap,
+        actId,
+        dayKey:day
+      }, 4000);
+      return ss2MakeReceiptResult_(raw);
+    };
+
+    const findReceiptFast = async function(delays){
+      for(let i=0; i<delays.length; i++){
+        if(remainingMs() <= 0) return null;
+        if(delays[i] > 0){
+          const okToContinue = await sleepWithinDeadline(delays[i]);
+          if(!okToContinue) return null;
+        }
+        const found = await readReceiptFast();
+        if(found) return found;
+      }
+      return null;
     };
 
     try{
-      let result = await postOnce(16000);
+      let result = await hardFetch(request, 16000);
       if(result && result.ok){
         try{ localStorage.setItem(finalKey,'1'); }catch(_){}
         return result;
       }
 
-      /* The Apps Script request may already have committed during a transport
-         timeout.  Check the durable receipt before any retry. */
-      let receiptResult = await ss2ReadReceiptUntilFound_(sap, actId, [0,700,1200,1800]);
+      let receiptResult = await findReceiptFast([0, 600, 1200]);
       if(receiptResult){
         try{ localStorage.setItem(finalKey,'1'); }catch(_){}
         return receiptResult;
       }
 
-      /* One safe retry with the SAME id. Server-side SAP+ActID/day guards stop
-         duplicate rows and duplicate awards even if the first request completes
-         concurrently. */
-      result = await postOnce(16000);
-      if(!(result && result.ok)){
-        receiptResult = await ss2ReadReceiptUntilFound_(sap, actId, [0,700,1200,1800,2500]);
-        if(receiptResult) result = receiptResult;
+      if(remainingMs() > 1200){
+        result = await hardFetch(request, 14000);
+        if(result && result.ok){
+          try{ localStorage.setItem(finalKey,'1'); }catch(_){}
+          return result;
+        }
       }
 
-      if(result && result.ok){
+      receiptResult = await findReceiptFast([0, 600, 1200]);
+      if(receiptResult){
         try{ localStorage.setItem(finalKey,'1'); }catch(_){}
-        return result;
+        return receiptResult;
       }
-      return result || {ok:false, error:'sheet_receipt_not_found'};
+
+      return {ok:false, error:'CLIENT_CONFIRM_TIMEOUT_60S'};
     }finally{
       __anesaSheetSubmitBusy = false;
       try{ sessionStorage.removeItem(pendingKey); }catch(_){}
