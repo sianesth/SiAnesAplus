@@ -2068,7 +2068,7 @@ input, select, button{
   /* ========= Global ========= */
   // Increment this value for each production release. It is a cache/release marker only.
   // IMPORTANT: changing this value must never sign users out or remove submission state.
-  const APP_VERSION = "2026-06-30-github-safe-session-guard-v1";
+  const APP_VERSION = "2026-08-26-github-safe-session-guard-v1";
 
   /*
    * SAFE RELEASE GATE
@@ -2186,7 +2186,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.4</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.3</span>
 </footer>
 
 <script type="module">
@@ -5587,6 +5587,14 @@ const pk = pairKeyOf(act);
           $('#actStatus').textContent = 'วันนี้คุณเลือกตอบ Protocol ไปแล้ว';
           return;
         }
+        if (res && res.errorCode === 'ACTIVITY_NOT_STARTED') {
+          $('#actStatus').textContent = 'กิจกรรมยังไม่ถึงเวลาเริ่ม กรุณารอถึงเวลาที่กำหนด';
+          return;
+        }
+        if (res && res.errorCode === 'ACTIVITY_CLOSED') {
+          $('#actStatus').textContent = 'กิจกรรมสิ้นสุดตามเวลาที่กำหนดแล้ว';
+          return;
+        }
         $('#actStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง';
         return;
       }
@@ -6466,6 +6474,18 @@ async function submitLottoAnswer(){
     if(!res || !res.ok){
       if(res && res.error === 'USER_NON_ACTIVE'){
         $('#lottoStatus').textContent = 'บัญชีถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
+        return;
+      }
+      if(res && res.errorCode === 'ACTIVITY_NOT_STARTED'){
+        $('#lottoStatus').textContent = 'กิจกรรมยังไม่ถึงเวลาเริ่ม กรุณารอถึงเวลาที่กำหนด';
+        if(button) button.disabled = false;
+        if(input) input.disabled = false;
+        return;
+      }
+      if(res && res.errorCode === 'ACTIVITY_CLOSED'){
+        $('#lottoStatus').textContent = 'กิจกรรมสิ้นสุดตามเวลาที่กำหนดแล้ว';
+        if(button) button.disabled = false;
+        if(input) input.disabled = false;
         return;
       }
       $('#lottoStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณากดส่งอีกครั้ง';
@@ -7716,6 +7736,20 @@ try{
       client:String((payload && payload.client) || 'web-anesa+')
     });
 
+    // Business-rule rejections are final for this click. Return them immediately
+    // instead of wasting time on receipt polling / retry.
+    const isTerminalSubmissionError_ = function(result){
+      const code = String((result && (result.errorCode || result.error)) || '').trim();
+      return [
+        'USER_NON_ACTIVE',
+        'USER_NOT_FOUND',
+        'ALREADY_ANSWERED_PROTOCOL',
+        'ACTIVITY_NOT_STARTED',
+        'ACTIVITY_CLOSED',
+        'missing sap or actId'
+      ].includes(code);
+    };
+
     const hardFetch = function(body, wantedTimeoutMs){
       const left = remainingMs();
       if(left <= 0) return Promise.resolve({ok:false, error:'CLIENT_CONFIRM_TIMEOUT_60S'});
@@ -7771,6 +7805,9 @@ try{
         try{ localStorage.setItem(finalKey,'1'); }catch(_){}
         return result;
       }
+      if(result && !result.ok && isTerminalSubmissionError_(result)){
+        return result;
+      }
 
       let receiptResult = await findReceiptFast([0, 600, 1200]);
       if(receiptResult){
@@ -7782,6 +7819,9 @@ try{
         result = await hardFetch(request, 14000);
         if(result && result.ok){
           try{ localStorage.setItem(finalKey,'1'); }catch(_){}
+          return result;
+        }
+        if(result && !result.ok && isTerminalSubmissionError_(result)){
           return result;
         }
       }
