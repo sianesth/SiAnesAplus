@@ -10,6 +10,7 @@
 <title>ANESA+ — Session 2</title>
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
+<link rel="icon" href="logo3.png" />
 <style>
 
   /* ========== Base variables ========== */
@@ -864,6 +865,9 @@ body.is-login main{
   margin:0;
 }
 
+
+
+
 /* ===== GROUP TOOLTIP PATCH (SAFE ADD-ON) ===== */
 .brand{ position:relative; }
 .welcome-line{ display:block; }
@@ -908,8 +912,11 @@ body.is-login main{
 
 
 <script>
-// === PRIVILEGE API CONFIG ===
-const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL : '';
+// === SHARED WEB APP CONFIG ===
+// Classic scripts and module scripts use the same current Apps Script deployment.
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxF1vw8ZjfbzDw6WzhfJT1b-f9lh4FIbRAuZYmRkq07-YpMIWTuBBTZuvrhTu-PlEOiEQ/exec';
+var API_URL = SCRIPT_URL;
+window.SCRIPT_URL = SCRIPT_URL;
 </script>
 
 <style>
@@ -2183,7 +2190,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.4</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.5</span>
 </footer>
 
 <script type="module">
@@ -8883,11 +8890,6 @@ function getRolling3MonthLabel(){
 </script>
 
 
-<script>
-
-
-
-
 <!-- ===== PRIVILEGE MODAL ===== -->
 <div id="privModal" class="modal">
   <div class="modal-box">
@@ -9220,6 +9222,13 @@ document.addEventListener('click', function(e){
   setTimeout(bindCurrentGroupName_, 1200);
 })();
 </script>
+
+
+
+
+
+
+
 
 <!-- SS2 LOTTO 24H retained-answer UI patch: HTML-only; no backend/schema/score changes. -->
 <!-- SS2 FIX 2026-06-27: persisted Correct=FALSE always renders as red ❌ ผิด; no score/data writes changed. -->
