@@ -2190,7 +2190,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.4</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.3</span>
 </footer>
 
 <script type="module">
@@ -5661,7 +5661,7 @@ const pk = pairKeyOf(act);
     try {
       /* STEP 1: wait for the Google Sheet receipt. No optimistic answer,
          no queue, and no Firebase write happens before this succeeds. */
-      // UX hard limit is enforced inside postSubmissionToSheet: failure returns within 1 minute.
+      // UX hard limit is enforced inside postSubmissionToSheet: the UI budget is 30 seconds.
       const res = await postSubmissionToSheet(payload);
 
       if (!res || !res.ok) {
@@ -5686,7 +5686,10 @@ const pk = pairKeyOf(act);
         return;
       }
 
-      /* STEP 2: Sheet is confirmed. Store/render the exact server result. */
+      /* STEP 2: Sheet is confirmed.
+         UX V5.3.3: close the question modal immediately AFTER the durable
+         Sheet receipt, then render the confirmed result on the main page.
+         No scoring, Sheet, lock, Firebase, Protocol, Lotto, or data-model logic changes. */
       markAnsConfirmed_(id);
       const pk = pairKeyOf(act);
       if (pk) markClinPairConfirmed_(pk);
@@ -5703,27 +5706,52 @@ const pk = pairKeyOf(act);
         Finalized: res.finalized !== false
       };
 
+      /* Close first, but only after res.ok === true from the Sheet-confirmed submit.
+         This makes the page feel immediate without ever showing a false success. */
+      try{
+        const modal = $('#actModal');
+        if(modal) modal.style.display = 'none';
+      }catch(_){}
+      actOpen = false;
+      try{
+        const actBtn = $('#btnActNow');
+        if(actBtn) actBtn.disabled = true;
+      }catch(_){}
+
+      /* Render from the exact confirmed server response.
+         Each display task is isolated so a non-critical UI/cache failure cannot
+         reopen or strand the already-confirmed question modal. */
       state.lastSubmission = final;
-      addOrUpdateWeekly({
-        dateISO: final.ts,
-        title: final.title,
-        actId: id,
-        result: final.correct,
-        points: final.points,
-        userAnswer: ans,
-        Finalized: final.Finalized
-      });
+      try{
+        addOrUpdateWeekly({
+          dateISO: final.ts,
+          title: final.title,
+          actId: id,
+          result: final.correct,
+          points: final.points,
+          userAnswer: ans,
+          Finalized: final.Finalized
+        });
+      }catch(_){}
 
       try{ if (typeof applyServerUserKPI_ === 'function') applyServerUserKPI_(res); }catch(_){}
-      renderLatest(final);
+      try{ renderLatest(final); }catch(_){}
       try{ ss2ApplySubmitResultToTop20Today_(id, act, final, ans, res); }catch(_){}
-
-      $('#actModal').style.display = 'none';
-      actOpen = false;
-      $('#btnActNow').disabled = true;
-      checkActivity();
+      try{ checkActivity(); }catch(_){}
       try{ if (typeof scheduleUserKPIRefreshAfterSubmit_ === 'function') scheduleUserKPIRefreshAfterSubmit_('sheet_confirmed'); }catch(_){}
-      toast('✅ บันทึกคำตอบแล้ว', 1400);
+      try{ toast('✅ บันทึกคำตอบแล้ว', 1400); }catch(_){}
+
+      /* Bring the confirmed result into view on small screens without blocking
+         submission completion or background realtime fan-out. */
+      try{
+        requestAnimationFrame(function(){
+          const resultBox = document.getElementById('actLatest');
+          if(resultBox && resultBox.style.display !== 'none'){
+            resultBox.setAttribute('aria-live','polite');
+            try{ resultBox.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(_){}
+          }
+        });
+      }catch(_){}
 
       /* STEP 3: only after UI has rendered, request Firebase fan-out. */
       fanoutSubmissionAfterDisplay_(payload, res);
@@ -7782,7 +7810,7 @@ try{
    * unconfirmed answer immediately. The same request id is retained and one
    * idempotent retry is performed only after a Sheet-receipt search.
    */
-  postSubmissionToSheet = async function(payload){
+  const __legacyPostSubmissionToSheet_20260629 = async function(payload){
     const url = String((typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) || '').trim();
     const sap = String((payload && payload.sap) || (state && state.sap) || '').trim();
     const actId = String((payload && payload.actId) || '').trim();
@@ -7948,7 +7976,7 @@ try{
    * Fan-out is display-only, but retrying it once makes the RTDB snapshot and
    * Top20 update resilient without ever appending a Sheet row or awarding points.
    */
-  fanoutSubmissionAfterDisplay_ = function(payload, confirmed){
+  const __legacyFanoutSubmissionAfterDisplay_20260629 = function(payload, confirmed){
     const sap = String((payload && payload.sap) || '').trim();
     const actId = String((payload && payload.actId) || '').trim();
     if(!sap || !actId || !confirmed || !confirmed.ok) return;
@@ -9399,14 +9427,15 @@ document.addEventListener('click', function(e){
 
 
 <!-- ========================================================================
- ANESA+ SS2 V5.3.2 — 2026-09-02
- SCOPE FIX: V5.3/V5.2 behavior is integrated directly inside the ES-module
- that owns postSubmissionToSheet / KPI / Top20 / fanout. This avoids classic
- script -> module lexical ReferenceError and preserves the existing UI/data model.
+ ANESA+ SS2 V5.3.4 — 2026-09-02
+ FAST CONFIRM UX: preserves the V5.3.3 confirmed-close behavior and disables
+ the superseded 2026-06-29 client transport/fanout overrides that were still
+ replacing the final 30-second transport with an obsolete 58-second retry path.
+ No backend/data-model/scoring change.
  ======================================================================== -->
-<script id="anesa-v532-scope-fix-diagnostic">
-window.ANESA_FINAL_STABLE_FAST_SUBMIT_V53={version:'20260902_V5_3_2_SCOPE_FIX',maxUserWaitMs:30000,lockMaxWaitMs:23000,automaticSecondSubmit:false,moduleIntegrated:true};
-window.ANESA_FINAL_STABLE_FAST_SUBMIT_V52={version:'20260902_V5_3_2_SCOPE_FIX',immediatePostSubmitSheetReads:false,fanoutSpreadsheetReads:false,moduleIntegrated:true,structureChanged:false};
+<script id="anesa-v534-fast-confirm-diagnostic">
+window.ANESA_FINAL_STABLE_FAST_SUBMIT_V53={version:'20260902_V5_3_4_FAST_CONFIRM_NO_LEGACY_OVERRIDE',maxUserWaitMs:30000,lockMaxWaitMs:23000,automaticSecondSubmit:false,moduleIntegrated:true,confirmedCloseImmediate:true};
+window.ANESA_FINAL_STABLE_FAST_SUBMIT_V52={version:'20260902_V5_3_4_FAST_CONFIRM_NO_LEGACY_OVERRIDE',immediatePostSubmitSheetReads:false,fanoutSpreadsheetReads:false,moduleIntegrated:true,structureChanged:false};
 </script>
 
 <!-- ANESA SS2 V5.3.1: Top20 immediate group-label hotfix; Firebase-only metadata fallback; no Sheet schema/logic change. -->
