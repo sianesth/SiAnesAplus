@@ -2190,7 +2190,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.3</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.4</span>
 </footer>
 
 <script type="module">
@@ -2270,58 +2270,116 @@ async function postSubmissionToSheet(payload){
   const url = String((typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) || '').trim();
   const sap = String((payload && payload.sap) || (state && state.sap) || '').trim();
   const actId = String((payload && payload.actId) || '').trim();
-
   if(!url) return {ok:false, error:'SCRIPT_URL missing'};
   if(!sap || !actId) return {ok:false, error:'missing sap or actId'};
   if(__anesaSheetSubmitBusy) return {ok:false, error:'sending'};
 
-  const pendingKey = `ans_pending:${submitDayKey_()}:${sap}:${actId}`;
-  const finalKey = `ans:${submitDayKey_()}:${sap}:${actId}`;
-  __anesaSheetSubmitBusy = true;
-  try{ localStorage.setItem(pendingKey, String(Date.now())); }catch(_){}
+  // V5.3.2: this function lives inside the ES-module that owns the submit UI.
+  // Keep the complete user-facing confirmation budget at ~30 seconds.
+  const deadlineAt = Date.now() + 30000;
+  const remaining = () => Math.max(0, deadlineAt - Date.now());
+  const waitWithin = async(ms) => {
+    const left = remaining();
+    if(left <= 0) return false;
+    await new Promise(resolve => setTimeout(resolve, Math.min(Number(ms || 0), left)));
+    return remaining() > 0;
+  };
+  const isTerminal = (r) => {
+    const c = String((r && (r.errorCode || r.error)) || '').trim();
+    return ['USER_NON_ACTIVE','USER_NOT_FOUND','ALREADY_ANSWERED_PROTOCOL','ACTIVITY_NOT_STARTED','ACTIVITY_CLOSED','missing sap or actId'].includes(c);
+  };
+  const receiptResult = (raw) => {
+    if(!raw || !raw.ok || !raw.found || !raw.receipt) return null;
+    const x = raw.receipt || {};
+    const bool = (v) => v === true ? true : (v === false ? false : (String(v || '').toUpperCase() === 'TRUE' ? true : (String(v || '').toUpperCase() === 'FALSE' ? false : null)));
+    return {
+      ok:true, duplicate:true, wroteRow:false,
+      correct:bool(x.correct),
+      points:Number(x.points || 0) || 0,
+      finalized:(x.finalized === false || String(x.finalized || '').toUpperCase() === 'FALSE') ? false : true,
+      receipt:{
+        row:Number(x.row || 0) || 0,
+        tsISO:String(x.tsISO || ''),
+        serverTS:String(x.serverTS || ''),
+        submitSeq:Number(x.submitSeq || 0) || 0,
+        submissionId:String(x.submissionId || '')
+      },
+      userKPI:raw.userKPI || null,
+      recoveredFromCache:true
+    };
+  };
 
-  const requestId = String((payload && payload.requestId) ||
-    (`sub_${Date.now()}_${Math.random().toString(36).slice(2,9)}`));
-
+  const day = submitDayKey_();
+  const pendingKey = `ans_pending:${day}:${sap}:${actId}`;
+  const finalKey = `ans:${day}:${sap}:${actId}`;
+  let saved = null;
+  try{ saved = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){ }
+  const requestId = String((payload && payload.requestId) || (saved && saved.requestId) || (`sub_${Date.now()}_${Math.random().toString(36).slice(2,10)}`));
   const request = Object.assign({}, payload || {}, {
-    action: 'submitAnswer',
-    sap,
-    actId,
-    requestId,
-    client: String((payload && payload.client) || 'web-anesa+')
+    action:'submitAnswer', sap, actId, requestId,
+    client:String((payload && payload.client) || 'web-anesa+')
   });
 
+  __anesaSheetSubmitBusy = true;
   try{
-    let result = await fetchJSONWithTimeout_(url, {
-      method: 'POST',
-      headers: {'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(request),
-      cache: 'no-store',
-      keepalive: false
-    }, 25000);
+    try{
+      sessionStorage.setItem(pendingKey, JSON.stringify({requestId, at:Date.now()}));
+      localStorage.setItem(pendingKey, String(Date.now()));
+    }catch(_){ }
 
-    /* A browser/network timeout can happen after Apps Script has appended the row.
-       Only then read the durable Sheet receipt; never POST a second answer. */
-    if(!result || !result.ok){
-      const receipt = await readSubmissionReceipt_(sap, actId).catch(function(){ return null; });
-      if(receipt && receipt.ok && receipt.found && receipt.receipt){
-        result = Object.assign({
-          ok:true,
-          duplicate:true,
-          wroteRow:false,
-          userKPI:null
-        }, receipt.receipt, { receipt:receipt.receipt });
+    const setStatus = (s) => { try{ const el=document.getElementById('actStatus'); if(el) el.textContent=s; }catch(_){ } };
+    setStatus('กำลังบันทึกคำตอบ กรุณารอสักครู่...');
+
+    // One click = ONE submitAnswer POST. No automatic second submit request.
+    const submitTimeout = Math.max(1000, Math.min(26000, remaining() - 250));
+    let result = null;
+    try{
+      result = await fetchJSONWithTimeout_(url, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify(request),
+        cache:'no-store',
+        keepalive:false
+      }, submitTimeout);
+    }catch(_){ result = {ok:false,error:'transport_error'}; }
+
+    if(result && result.ok){
+      try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
+      return result;
+    }
+    if(isTerminal(result)) return result;
+
+    // Response may be lost after Sheet commit. Recover from ScriptCache only;
+    // never scan Spreadsheet and never POST the answer a second time.
+    setStatus('กำลังยืนยันการบันทึกคำตอบ กรุณารอสักครู่...');
+    const delays = [0,450,750,1050];
+    for(const d of delays){
+      if(remaining() <= 250) break;
+      if(d && !(await waitWithin(d))) break;
+      const left = remaining();
+      if(left <= 250) break;
+      let raw = null;
+      try{
+        raw = await fetchJSONWithTimeout_(SCRIPT_URL, {
+          method:'POST',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body:JSON.stringify({action:'submission:receiptfast',sap,actId,dayKey:day}),
+          cache:'no-store',
+          keepalive:false
+        }, Math.max(250, Math.min(1400, left - 100)));
+      }catch(_){ }
+      const hit = receiptResult(raw);
+      if(hit){
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
+        return hit;
       }
     }
 
-    if(result && result.ok){
-      try{ localStorage.setItem(finalKey, '1'); }catch(_){}
-      return result;
-    }
-    return result || {ok:false, error:'empty_response'};
+    return {ok:false,error:'SYSTEM_CONFIRM_PENDING_30S',retryable:true,requestId};
   }finally{
     __anesaSheetSubmitBusy = false;
-    try{ localStorage.removeItem(pendingKey); }catch(_){}
+    try{ sessionStorage.removeItem(pendingKey); }catch(_){ }
+    try{ localStorage.removeItem(pendingKey); }catch(_){ }
   }
 }
 
@@ -2332,18 +2390,43 @@ function fanoutSubmissionAfterDisplay_(payload, confirmed){
   const actId = String((payload && payload.actId) || '').trim();
   if(!sap || !actId || !confirmed || !confirmed.ok) return;
 
+  let meta = {};
+  try{
+    const a = (typeof getActMetaById === 'function') ? (getActMetaById(actId) || {}) : {};
+    meta = {
+      Title:String(a.Title || a.title || a.Question || a.question || ''),
+      Question:String(a.Question || a.question || ''),
+      Category:String(a.Category || a.category || ''),
+      GroupId:String(a.GroupId || a.groupId || ''),
+      InputType:String(a.InputType || a.inputType || '')
+    };
+  }catch(_){ }
+
+  const r = confirmed.receipt || {};
   const body = {
     action:'submission:fanout',
     sap,
     actId,
-    answer: String((payload && payload.answer) || '').trim(),
-    dayKey: submitDayKey_(),
-    receipt: confirmed.receipt || {
-      row: confirmed.row || 0,
-      tsISO: confirmed.tsISO || (payload && payload.timestamp) || ''
-    }
+    answer:String((payload && payload.answer) || '').trim(),
+    dayKey:submitDayKey_(),
+    timestamp:String(r.tsISO || confirmed.tsISO || (payload && payload.timestamp) || ''),
+    receipt:r,
+    confirmed:{
+      ok:true,
+      duplicate:!!confirmed.duplicate,
+      row:Number(confirmed.row || r.row || 0) || 0,
+      correct:confirmed.correct,
+      points:Number(confirmed.points || 0) || 0,
+      finalized:confirmed.finalized,
+      receipt:r,
+      userKPI:(confirmed.userKPI && typeof confirmed.userKPI === 'object') ? confirmed.userKPI : null
+    },
+    meta
   };
 
+  // Small jitter spreads display-only fanout calls from a simultaneous burst.
+  // Backend fanout uses the confirmed ScriptCache receipt and performs zero Sheet reads.
+  const delay = 500 + Math.floor(Math.random() * 2200);
   setTimeout(function(){
     fetchJSONWithTimeout_(SCRIPT_URL, {
       method:'POST',
@@ -2352,7 +2435,7 @@ function fanoutSubmissionAfterDisplay_(payload, confirmed){
       cache:'no-store',
       keepalive:false
     }, 12000).catch(function(){});
-  }, 0);
+  }, delay);
 }
 
 // แปลงค่า Status จากชีทให้เป็น boolean
@@ -8225,9 +8308,15 @@ try{
     try{
       const ctx=ss2Top20TodayContext_();
       if(!ctx) return;
-      const raw=state._ss2Top20RawDay;
-      if(raw) ss2StoreRealtimeTop20_(ctx,raw);
-      ss2RefreshTop20TodayFromSheet_(ctx, true).catch(()=>{});
+      let packet=null;
+      const raw=state && state._ss2Top20RawDay;
+      if(raw) packet=ss2StoreRealtimeTop20_(ctx,raw);
+      if(!packet && typeof ss2GetRealtimeTop20_==='function') packet=ss2GetRealtimeTop20_(ctx);
+      const dlg=document.getElementById('dlgTop');
+      if(packet && dlg && dlg.open && state.top20DialogKind==='top20today'){
+        renderTop20TodayTableRealtime_(packet.rows||[],!!packet.protocol);
+      }
+      // No immediate Sheet refresh here; user-opened Top20 still reconciles authoritatively.
     }catch(_){}
   };
 
@@ -8243,20 +8332,9 @@ try{
    */
   let __ss2KpiSubmitRefreshTimer = null;
   scheduleUserKPIRefreshAfterSubmit_ = function(){
-    try{ if(__ss2KpiSubmitRefreshTimer) clearTimeout(__ss2KpiSubmitRefreshTimer); }catch(_){}
-    __ss2KpiSubmitRefreshTimer = setTimeout(async function(){
-      __ss2KpiSubmitRefreshTimer = null;
-      try{
-        if(typeof refreshUserSummary === 'function') await refreshUserSummary('sheetOnly');
-        const groupNo = String((state && (state.groupNumber || state.GroupNumber)) || '').trim();
-        if(groupNo && typeof refreshGroupTotalDirect_ === 'function'){
-          await refreshGroupTotalDirect_(groupNo);
-        }
-        if(typeof renderKPI === 'function') renderKPI();
-      }catch(e){
-        console.warn('coalesced Sheet KPI refresh failed:', e);
-      }
-    }, 2200);
+    try{ if(__ss2KpiSubmitRefreshTimer){ clearTimeout(__ss2KpiSubmitRefreshTimer); __ss2KpiSubmitRefreshTimer=null; } }catch(_){}
+    // Sheet-confirmed KPI is already applied by the submit response. Avoid a burst reread.
+    try{ if(typeof renderKPI === 'function') renderKPI(); }catch(_){}
   };
 
   startSheetKPIWatcher_ = function(){
@@ -9321,241 +9399,14 @@ document.addEventListener('click', function(e){
 
 
 <!-- ========================================================================
- ANESA+ SS2 FINAL STABLE FAST SUBMIT V5.1 — 2026-09-02
- SURGICAL OVERRIDE: only postSubmissionToSheet is replaced.
- Existing Login/KPI/Protocol/Lotto/Top20/Rewards/Reports/Firebase UI remains intact.
+ ANESA+ SS2 V5.3.2 — 2026-09-02
+ SCOPE FIX: V5.3/V5.2 behavior is integrated directly inside the ES-module
+ that owns postSubmissionToSheet / KPI / Top20 / fanout. This avoids classic
+ script -> module lexical ReferenceError and preserves the existing UI/data model.
  ======================================================================== -->
-<script id="anesa-final-stable-fast-submit-v51-20260902">
-(function(){
-  'use strict';
-  const V51_ID='ANESA_SS2_FINAL_STABLE_V5_1_20260902';
-  const sleep=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
-
-  function terminal(r){
-    const c=String((r&&(r.errorCode||r.error))||'').trim();
-    return ['USER_NON_ACTIVE','USER_NOT_FOUND','ALREADY_ANSWERED_PROTOCOL','ACTIVITY_NOT_STARTED','ACTIVITY_CLOSED','missing sap or actId'].includes(c);
-  }
-  function receiptResult(raw){
-    if(!raw||!raw.ok||!raw.found||!raw.receipt) return null;
-    const x=raw.receipt||{};
-    const bool=(v)=>v===true?true:(v===false?false:(String(v||'').toUpperCase()==='TRUE'?true:(String(v||'').toUpperCase()==='FALSE'?false:null)));
-    return {
-      ok:true,duplicate:true,wroteRow:false,
-      correct:bool(x.correct),
-      points:Number(x.points||0)||0,
-      finalized:(x.finalized===false||String(x.finalized||'').toUpperCase()==='FALSE')?false:true,
-      receipt:{
-        row:Number(x.row||0)||0,tsISO:String(x.tsISO||''),serverTS:String(x.serverTS||''),
-        submitSeq:Number(x.submitSeq||0)||0,submissionId:String(x.submissionId||'')
-      },
-      userKPI:raw.userKPI||null,
-      recoveredFromCache:true
-    };
-  }
-  async function cacheReceipt(sap,actId,day){
-    try{
-      const r=await fetchJSONWithTimeout_(SCRIPT_URL,{
-        method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({action:'submission:receiptfast',sap:String(sap||''),actId:String(actId||''),dayKey:String(day||'')}),
-        cache:'no-store',keepalive:false
-      },7000);
-      return receiptResult(r);
-    }catch(_){ return null; }
-  }
-  async function pollCache(sap,actId,day,delays){
-    for(const d of delays){
-      if(d) await sleep(d);
-      const hit=await cacheReceipt(sap,actId,day);
-      if(hit) return hit;
-    }
-    return null;
-  }
-
-  postSubmissionToSheet=async function(payload){
-    const url=String((typeof SCRIPT_URL!=='undefined'&&SCRIPT_URL)||'').trim();
-    const sap=String((payload&&payload.sap)||(state&&state.sap)||'').trim();
-    const actId=String((payload&&payload.actId)||'').trim();
-    if(!url) return {ok:false,error:'SCRIPT_URL missing'};
-    if(!sap||!actId) return {ok:false,error:'missing sap or actId'};
-    if(__anesaSheetSubmitBusy) return {ok:false,error:'sending'};
-
-    /* V5.3 user-facing budget: never intentionally keep the submit UI waiting
-       longer than 30 seconds. Backend lock budget is 23 seconds so there is
-       headroom for Sheet write + response + cache-only recovery. */
-    const deadlineAt=Date.now()+30000;
-    const remaining=()=>Math.max(0,deadlineAt-Date.now());
-    const sleepWithin=async(ms)=>{
-      const left=remaining();
-      if(left<=0) return false;
-      await sleep(Math.min(Number(ms||0),left));
-      return remaining()>0;
-    };
-
-    const day=submitDayKey_();
-    const pendingKey=`ans_pending:${day}:${sap}:${actId}`;
-    const finalKey=`ans:${day}:${sap}:${actId}`;
-    let saved=null;
-    try{ saved=JSON.parse(sessionStorage.getItem(pendingKey)||'null'); }catch(_){}
-    const requestId=String((payload&&payload.requestId)||(saved&&saved.requestId)||(`sub_${Date.now()}_${Math.random().toString(36).slice(2,10)}`));
-    const request=Object.assign({},payload||{},{action:'submitAnswer',sap,actId,requestId,client:String((payload&&payload.client)||'web-anesa+')});
-
-    __anesaSheetSubmitBusy=true;
-    try{
-      try{
-        sessionStorage.setItem(pendingKey,JSON.stringify({requestId,at:Date.now()}));
-        localStorage.setItem(pendingKey,String(Date.now()));
-      }catch(_){}
-
-      const status=(s)=>{ try{ const el=document.getElementById('actStatus'); if(el) el.textContent=s; }catch(_){} };
-      status('กำลังบันทึกคำตอบ กรุณารอสักครู่...');
-
-      /* One click = one submitAnswer POST. No automatic second submit.
-         26s transport timeout leaves ~4s for cache-only confirmation recovery. */
-      const submitTimeout=Math.max(1000,Math.min(26000,remaining()-250));
-      let result=null;
-      try{
-        result=await fetchJSONWithTimeout_(url,{
-          method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body:JSON.stringify(request),cache:'no-store',keepalive:false
-        },submitTimeout);
-      }catch(_){ result={ok:false,error:'transport_error'}; }
-
-      if(result&&result.ok){ try{ localStorage.setItem(finalKey,'1'); }catch(_){} return result; }
-      if(terminal(result)) return result;
-
-      /* If Apps Script committed the row but the browser lost the response,
-         use only ScriptCache. Never read Spreadsheet for recovery here. */
-      status('กำลังยืนยันการบันทึกคำตอบ กรุณารอสักครู่...');
-      const delays=[0,450,750,1050];
-      for(const d of delays){
-        if(remaining()<=250) break;
-        if(d){ const go=await sleepWithin(d); if(!go) break; }
-        const left=remaining();
-        if(left<=250) break;
-        let raw=null;
-        try{
-          raw=await fetchJSONWithTimeout_(SCRIPT_URL,{
-            method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-            body:JSON.stringify({action:'submission:receiptfast',sap,actId,dayKey:day}),
-            cache:'no-store',keepalive:false
-          },Math.max(250,Math.min(1400,left-100)));
-        }catch(_){}
-        const hit=receiptResult(raw);
-        if(hit){ try{ localStorage.setItem(finalKey,'1'); }catch(_){} return hit; }
-      }
-
-      return {ok:false,error:'SYSTEM_CONFIRM_PENDING_30S',retryable:true,requestId};
-    }finally{
-      __anesaSheetSubmitBusy=false;
-      try{ sessionStorage.removeItem(pendingKey); }catch(_){}
-      try{ localStorage.removeItem(pendingKey); }catch(_){}
-    }
-  };
-
-  window.ANESA_FINAL_STABLE_FAST_SUBMIT_V51={version:V51_ID,sheetFirst:true,onlySubmitTransportOverridden:true};
-  window.ANESA_FINAL_STABLE_FAST_SUBMIT_V53={version:'20260902_V5_3_30S_UX_CAP',maxUserWaitMs:30000,lockMaxWaitMs:23000,automaticSecondSubmit:false};
-})();
-</script>
-
-
-
-<script>
-/* ============================================================================
- * ANESA+ SS2 FINAL STABLE V5.2 — 2026-09-02
- * MICRO-PATCH: no immediate Spreadsheet rereads after a confirmed submission.
- * Submission itself remains V5.1 Sheet-first and unchanged.
- * ============================================================================ */
-(function(){
-  const V52_ID='20260902_V5_2_POST_SUBMIT_NO_SHEET_BURST';
-
-  /* The submit response already carries the exact Sheet-confirmed KPI.
-     The main submit handler applies it before calling this function, so do not
-     send 20 simultaneous Users/UserGroups reads 2.2 seconds later. */
-  scheduleUserKPIRefreshAfterSubmit_=function(){
-    try{ if(typeof renderKPI==='function') renderKPI(); }catch(_){}
-  };
-
-  /* Do not force a Top20 Sheet read from every device immediately after submit.
-     Keep current realtime/cache data warm; opening Top20 later may still perform
-     its existing authoritative Sheet refresh outside the submit hot path. */
-  ss2ApplySubmitResultToTop20Today_=function(){
-    try{
-      const ctx=(typeof ss2Top20TodayContext_==='function') ? ss2Top20TodayContext_() : null;
-      if(!ctx) return;
-      let packet=null;
-      const raw=state && state._ss2Top20RawDay;
-      if(raw && typeof ss2StoreRealtimeTop20_==='function') packet=ss2StoreRealtimeTop20_(ctx,raw);
-      if(!packet && typeof ss2GetRealtimeTop20_==='function') packet=ss2GetRealtimeTop20_(ctx);
-      const dlg=document.getElementById('dlgTop');
-      if(packet && dlg && dlg.open && state.top20DialogKind==='top20today' && typeof renderTop20TodayTableRealtime_==='function'){
-        renderTop20TodayTableRealtime_(packet.rows||[],!!packet.protocol);
-      }
-    }catch(_){}
-  };
-
-  /* Post-display fan-out carries the already-confirmed Sheet result to Apps Script.
-     Server V5.2 therefore never needs to re-read receipt, Users, UserGroups, or
-     rebuild a complete Top20 snapshot from Sheet for each submission. */
-  fanoutSubmissionAfterDisplay_=function(payload,confirmed){
-    const sap=String((payload&&payload.sap)||'').trim();
-    const actId=String((payload&&payload.actId)||'').trim();
-    if(!sap||!actId||!confirmed||!confirmed.ok) return;
-
-    let meta={};
-    try{
-      const a=(typeof getActMetaById==='function') ? (getActMetaById(actId)||{}) : {};
-      meta={
-        Title:String(a.Title||a.title||a.Question||a.question||''),
-        Question:String(a.Question||a.question||''),
-        Category:String(a.Category||a.category||''),
-        GroupId:String(a.GroupId||a.groupId||''),
-        InputType:String(a.InputType||a.inputType||'')
-      };
-    }catch(_){}
-
-    const r=confirmed.receipt||{};
-    const body={
-      action:'submission:fanout',
-      sap,
-      actId,
-      answer:String((payload&&payload.answer)||'').trim(),
-      dayKey:submitDayKey_(),
-      timestamp:String(r.tsISO||confirmed.tsISO||(payload&&payload.timestamp)||''),
-      receipt:r,
-      confirmed:{
-        ok:true,
-        duplicate:!!confirmed.duplicate,
-        row:Number(confirmed.row||r.row||0)||0,
-        correct:confirmed.correct,
-        points:Number(confirmed.points||0)||0,
-        finalized:confirmed.finalized,
-        receipt:r,
-        userKPI:(confirmed.userKPI&&typeof confirmed.userKPI==='object')?confirmed.userKPI:null
-      },
-      meta
-    };
-
-    /* Small random spread prevents all 20 post-display fan-outs from arriving
-       at Apps Script in the exact same millisecond. No Spreadsheet work occurs
-       in this endpoint, so this affects display sync only, never scoring. */
-    const delay=500+Math.floor(Math.random()*2200);
-    setTimeout(function(){
-      fetchJSONWithTimeout_(SCRIPT_URL,{
-        method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(body),cache:'no-store',keepalive:false
-      },12000).catch(function(){});
-    },delay);
-  };
-
-  window.ANESA_FINAL_STABLE_FAST_SUBMIT_V52={
-    version:V52_ID,
-    sheetFirst:true,
-    submitEngine:'V5.3 30-second UX cap',
-    immediatePostSubmitSheetReads:false,
-    fanoutSpreadsheetReads:false,
-    structureChanged:false
-  };
-})();
+<script id="anesa-v532-scope-fix-diagnostic">
+window.ANESA_FINAL_STABLE_FAST_SUBMIT_V53={version:'20260902_V5_3_2_SCOPE_FIX',maxUserWaitMs:30000,lockMaxWaitMs:23000,automaticSecondSubmit:false,moduleIntegrated:true};
+window.ANESA_FINAL_STABLE_FAST_SUBMIT_V52={version:'20260902_V5_3_2_SCOPE_FIX',immediatePostSubmitSheetReads:false,fanoutSpreadsheetReads:false,moduleIntegrated:true,structureChanged:false};
 </script>
 
 <!-- ANESA SS2 V5.3.1: Top20 immediate group-label hotfix; Firebase-only metadata fallback; no Sheet schema/logic change. -->
