@@ -10,7 +10,6 @@
 <title>ANESA+ — Session 2</title>
 <link rel="preconnect" href="https://anesaplus-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="preload" as="image" href="logo3.png" />
-<link rel="icon" href="logo3.png" />
 <style>
 
   /* ========== Base variables ========== */
@@ -912,11 +911,8 @@ body.is-login main{
 
 
 <script>
-// === SHARED WEB APP CONFIG ===
-// Classic scripts and module scripts use the same current Apps Script deployment.
-var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxF1vw8ZjfbzDw6WzhfJT1b-f9lh4FIbRAuZYmRkq07-YpMIWTuBBTZuvrhTu-PlEOiEQ/exec';
-var API_URL = SCRIPT_URL;
-window.SCRIPT_URL = SCRIPT_URL;
+// === PRIVILEGE API CONFIG ===
+const API_URL = (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) ? SCRIPT_URL : '';
 </script>
 
 <style>
@@ -2072,7 +2068,7 @@ input, select, button{
   /* ========= Global ========= */
   // Increment this value for each production release. It is a cache/release marker only.
   // IMPORTANT: changing this value must never sign users out or remove submission state.
-  const APP_VERSION = "2026-08-26-github-safe-session-guard-v1";
+  const APP_VERSION = "2026-06-30-github-safe-session-guard-v1";
 
   /*
    * SAFE RELEASE GATE
@@ -2190,7 +2186,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.3</span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.2 • Release 2026-06-30</span>
 </footer>
 
 <script type="module">
@@ -2270,116 +2266,58 @@ async function postSubmissionToSheet(payload){
   const url = String((typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) || '').trim();
   const sap = String((payload && payload.sap) || (state && state.sap) || '').trim();
   const actId = String((payload && payload.actId) || '').trim();
+
   if(!url) return {ok:false, error:'SCRIPT_URL missing'};
   if(!sap || !actId) return {ok:false, error:'missing sap or actId'};
   if(__anesaSheetSubmitBusy) return {ok:false, error:'sending'};
 
-  // V5.3.2: this function lives inside the ES-module that owns the submit UI.
-  // Keep the complete user-facing confirmation budget at ~30 seconds.
-  const deadlineAt = Date.now() + 30000;
-  const remaining = () => Math.max(0, deadlineAt - Date.now());
-  const waitWithin = async(ms) => {
-    const left = remaining();
-    if(left <= 0) return false;
-    await new Promise(resolve => setTimeout(resolve, Math.min(Number(ms || 0), left)));
-    return remaining() > 0;
-  };
-  const isTerminal = (r) => {
-    const c = String((r && (r.errorCode || r.error)) || '').trim();
-    return ['USER_NON_ACTIVE','USER_NOT_FOUND','ALREADY_ANSWERED_PROTOCOL','ACTIVITY_NOT_STARTED','ACTIVITY_CLOSED','missing sap or actId'].includes(c);
-  };
-  const receiptResult = (raw) => {
-    if(!raw || !raw.ok || !raw.found || !raw.receipt) return null;
-    const x = raw.receipt || {};
-    const bool = (v) => v === true ? true : (v === false ? false : (String(v || '').toUpperCase() === 'TRUE' ? true : (String(v || '').toUpperCase() === 'FALSE' ? false : null)));
-    return {
-      ok:true, duplicate:true, wroteRow:false,
-      correct:bool(x.correct),
-      points:Number(x.points || 0) || 0,
-      finalized:(x.finalized === false || String(x.finalized || '').toUpperCase() === 'FALSE') ? false : true,
-      receipt:{
-        row:Number(x.row || 0) || 0,
-        tsISO:String(x.tsISO || ''),
-        serverTS:String(x.serverTS || ''),
-        submitSeq:Number(x.submitSeq || 0) || 0,
-        submissionId:String(x.submissionId || '')
-      },
-      userKPI:raw.userKPI || null,
-      recoveredFromCache:true
-    };
-  };
+  const pendingKey = `ans_pending:${submitDayKey_()}:${sap}:${actId}`;
+  const finalKey = `ans:${submitDayKey_()}:${sap}:${actId}`;
+  __anesaSheetSubmitBusy = true;
+  try{ localStorage.setItem(pendingKey, String(Date.now())); }catch(_){}
 
-  const day = submitDayKey_();
-  const pendingKey = `ans_pending:${day}:${sap}:${actId}`;
-  const finalKey = `ans:${day}:${sap}:${actId}`;
-  let saved = null;
-  try{ saved = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){ }
-  const requestId = String((payload && payload.requestId) || (saved && saved.requestId) || (`sub_${Date.now()}_${Math.random().toString(36).slice(2,10)}`));
+  const requestId = String((payload && payload.requestId) ||
+    (`sub_${Date.now()}_${Math.random().toString(36).slice(2,9)}`));
+
   const request = Object.assign({}, payload || {}, {
-    action:'submitAnswer', sap, actId, requestId,
-    client:String((payload && payload.client) || 'web-anesa+')
+    action: 'submitAnswer',
+    sap,
+    actId,
+    requestId,
+    client: String((payload && payload.client) || 'web-anesa+')
   });
 
-  __anesaSheetSubmitBusy = true;
   try{
-    try{
-      sessionStorage.setItem(pendingKey, JSON.stringify({requestId, at:Date.now()}));
-      localStorage.setItem(pendingKey, String(Date.now()));
-    }catch(_){ }
+    let result = await fetchJSONWithTimeout_(url, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(request),
+      cache: 'no-store',
+      keepalive: false
+    }, 25000);
 
-    const setStatus = (s) => { try{ const el=document.getElementById('actStatus'); if(el) el.textContent=s; }catch(_){ } };
-    setStatus('กำลังบันทึกคำตอบ กรุณารอสักครู่...');
-
-    // One click = ONE submitAnswer POST. No automatic second submit request.
-    const submitTimeout = Math.max(1000, Math.min(26000, remaining() - 250));
-    let result = null;
-    try{
-      result = await fetchJSONWithTimeout_(url, {
-        method:'POST',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(request),
-        cache:'no-store',
-        keepalive:false
-      }, submitTimeout);
-    }catch(_){ result = {ok:false,error:'transport_error'}; }
-
-    if(result && result.ok){
-      try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
-      return result;
-    }
-    if(isTerminal(result)) return result;
-
-    // Response may be lost after Sheet commit. Recover from ScriptCache only;
-    // never scan Spreadsheet and never POST the answer a second time.
-    setStatus('กำลังยืนยันการบันทึกคำตอบ กรุณารอสักครู่...');
-    const delays = [0,450,750,1050];
-    for(const d of delays){
-      if(remaining() <= 250) break;
-      if(d && !(await waitWithin(d))) break;
-      const left = remaining();
-      if(left <= 250) break;
-      let raw = null;
-      try{
-        raw = await fetchJSONWithTimeout_(SCRIPT_URL, {
-          method:'POST',
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body:JSON.stringify({action:'submission:receiptfast',sap,actId,dayKey:day}),
-          cache:'no-store',
-          keepalive:false
-        }, Math.max(250, Math.min(1400, left - 100)));
-      }catch(_){ }
-      const hit = receiptResult(raw);
-      if(hit){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
-        return hit;
+    /* A browser/network timeout can happen after Apps Script has appended the row.
+       Only then read the durable Sheet receipt; never POST a second answer. */
+    if(!result || !result.ok){
+      const receipt = await readSubmissionReceipt_(sap, actId).catch(function(){ return null; });
+      if(receipt && receipt.ok && receipt.found && receipt.receipt){
+        result = Object.assign({
+          ok:true,
+          duplicate:true,
+          wroteRow:false,
+          userKPI:null
+        }, receipt.receipt, { receipt:receipt.receipt });
       }
     }
 
-    return {ok:false,error:'SYSTEM_CONFIRM_PENDING_30S',retryable:true,requestId};
+    if(result && result.ok){
+      try{ localStorage.setItem(finalKey, '1'); }catch(_){}
+      return result;
+    }
+    return result || {ok:false, error:'empty_response'};
   }finally{
     __anesaSheetSubmitBusy = false;
-    try{ sessionStorage.removeItem(pendingKey); }catch(_){ }
-    try{ localStorage.removeItem(pendingKey); }catch(_){ }
+    try{ localStorage.removeItem(pendingKey); }catch(_){}
   }
 }
 
@@ -2390,43 +2328,18 @@ function fanoutSubmissionAfterDisplay_(payload, confirmed){
   const actId = String((payload && payload.actId) || '').trim();
   if(!sap || !actId || !confirmed || !confirmed.ok) return;
 
-  let meta = {};
-  try{
-    const a = (typeof getActMetaById === 'function') ? (getActMetaById(actId) || {}) : {};
-    meta = {
-      Title:String(a.Title || a.title || a.Question || a.question || ''),
-      Question:String(a.Question || a.question || ''),
-      Category:String(a.Category || a.category || ''),
-      GroupId:String(a.GroupId || a.groupId || ''),
-      InputType:String(a.InputType || a.inputType || '')
-    };
-  }catch(_){ }
-
-  const r = confirmed.receipt || {};
   const body = {
     action:'submission:fanout',
     sap,
     actId,
-    answer:String((payload && payload.answer) || '').trim(),
-    dayKey:submitDayKey_(),
-    timestamp:String(r.tsISO || confirmed.tsISO || (payload && payload.timestamp) || ''),
-    receipt:r,
-    confirmed:{
-      ok:true,
-      duplicate:!!confirmed.duplicate,
-      row:Number(confirmed.row || r.row || 0) || 0,
-      correct:confirmed.correct,
-      points:Number(confirmed.points || 0) || 0,
-      finalized:confirmed.finalized,
-      receipt:r,
-      userKPI:(confirmed.userKPI && typeof confirmed.userKPI === 'object') ? confirmed.userKPI : null
-    },
-    meta
+    answer: String((payload && payload.answer) || '').trim(),
+    dayKey: submitDayKey_(),
+    receipt: confirmed.receipt || {
+      row: confirmed.row || 0,
+      tsISO: confirmed.tsISO || (payload && payload.timestamp) || ''
+    }
   };
 
-  // Small jitter spreads display-only fanout calls from a simultaneous burst.
-  // Backend fanout uses the confirmed ScriptCache receipt and performs zero Sheet reads.
-  const delay = 500 + Math.floor(Math.random() * 2200);
   setTimeout(function(){
     fetchJSONWithTimeout_(SCRIPT_URL, {
       method:'POST',
@@ -2435,7 +2348,7 @@ function fanoutSubmissionAfterDisplay_(payload, confirmed){
       cache:'no-store',
       keepalive:false
     }, 12000).catch(function(){});
-  }, delay);
+  }, 0);
 }
 
 // แปลงค่า Status จากชีทให้เป็น boolean
@@ -5661,7 +5574,6 @@ const pk = pairKeyOf(act);
     try {
       /* STEP 1: wait for the Google Sheet receipt. No optimistic answer,
          no queue, and no Firebase write happens before this succeeds. */
-      // UX hard limit is enforced inside postSubmissionToSheet: the UI budget is 30 seconds.
       const res = await postSubmissionToSheet(payload);
 
       if (!res || !res.ok) {
@@ -5674,22 +5586,11 @@ const pk = pairKeyOf(act);
           $('#actStatus').textContent = 'วันนี้คุณเลือกตอบ Protocol ไปแล้ว';
           return;
         }
-        if (res && res.errorCode === 'ACTIVITY_NOT_STARTED') {
-          $('#actStatus').textContent = 'กิจกรรมยังไม่ถึงเวลาเริ่ม กรุณารอถึงเวลาที่กำหนด';
-          return;
-        }
-        if (res && res.errorCode === 'ACTIVITY_CLOSED') {
-          $('#actStatus').textContent = 'กิจกรรมสิ้นสุดตามเวลาที่กำหนดแล้ว';
-          return;
-        }
-        $('#actStatus').textContent = 'ระบบยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาติดต่อผู้ดูแลระบบ';
+        $('#actStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง';
         return;
       }
 
-      /* STEP 2: Sheet is confirmed.
-         UX V5.3.3: close the question modal immediately AFTER the durable
-         Sheet receipt, then render the confirmed result on the main page.
-         No scoring, Sheet, lock, Firebase, Protocol, Lotto, or data-model logic changes. */
+      /* STEP 2: Sheet is confirmed. Store/render the exact server result. */
       markAnsConfirmed_(id);
       const pk = pairKeyOf(act);
       if (pk) markClinPairConfirmed_(pk);
@@ -5706,58 +5607,33 @@ const pk = pairKeyOf(act);
         Finalized: res.finalized !== false
       };
 
-      /* Close first, but only after res.ok === true from the Sheet-confirmed submit.
-         This makes the page feel immediate without ever showing a false success. */
-      try{
-        const modal = $('#actModal');
-        if(modal) modal.style.display = 'none';
-      }catch(_){}
-      actOpen = false;
-      try{
-        const actBtn = $('#btnActNow');
-        if(actBtn) actBtn.disabled = true;
-      }catch(_){}
-
-      /* Render from the exact confirmed server response.
-         Each display task is isolated so a non-critical UI/cache failure cannot
-         reopen or strand the already-confirmed question modal. */
       state.lastSubmission = final;
-      try{
-        addOrUpdateWeekly({
-          dateISO: final.ts,
-          title: final.title,
-          actId: id,
-          result: final.correct,
-          points: final.points,
-          userAnswer: ans,
-          Finalized: final.Finalized
-        });
-      }catch(_){}
+      addOrUpdateWeekly({
+        dateISO: final.ts,
+        title: final.title,
+        actId: id,
+        result: final.correct,
+        points: final.points,
+        userAnswer: ans,
+        Finalized: final.Finalized
+      });
 
       try{ if (typeof applyServerUserKPI_ === 'function') applyServerUserKPI_(res); }catch(_){}
-      try{ renderLatest(final); }catch(_){}
+      renderLatest(final);
       try{ ss2ApplySubmitResultToTop20Today_(id, act, final, ans, res); }catch(_){}
-      try{ checkActivity(); }catch(_){}
-      try{ if (typeof scheduleUserKPIRefreshAfterSubmit_ === 'function') scheduleUserKPIRefreshAfterSubmit_('sheet_confirmed'); }catch(_){}
-      try{ toast('✅ บันทึกคำตอบแล้ว', 1400); }catch(_){}
 
-      /* Bring the confirmed result into view on small screens without blocking
-         submission completion or background realtime fan-out. */
-      try{
-        requestAnimationFrame(function(){
-          const resultBox = document.getElementById('actLatest');
-          if(resultBox && resultBox.style.display !== 'none'){
-            resultBox.setAttribute('aria-live','polite');
-            try{ resultBox.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(_){}
-          }
-        });
-      }catch(_){}
+      $('#actModal').style.display = 'none';
+      actOpen = false;
+      $('#btnActNow').disabled = true;
+      checkActivity();
+      try{ if (typeof scheduleUserKPIRefreshAfterSubmit_ === 'function') scheduleUserKPIRefreshAfterSubmit_('sheet_confirmed'); }catch(_){}
+      toast('✅ บันทึกคำตอบแล้ว', 1400);
 
       /* STEP 3: only after UI has rendered, request Firebase fan-out. */
       fanoutSubmissionAfterDisplay_(payload, res);
     } catch (err) {
       console.error('submit activity failed', err);
-      $('#actStatus').textContent = 'ระบบยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาติดต่อผู้ดูแลระบบ';
+      $('#actStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาลองอีกครั้ง';
     } finally {
       _submitting = false;
       if (submitButton && $('#actModal').style.display !== 'none') submitButton.disabled = false;
@@ -6591,19 +6467,7 @@ async function submitLottoAnswer(){
         $('#lottoStatus').textContent = 'บัญชีถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
         return;
       }
-      if(res && res.errorCode === 'ACTIVITY_NOT_STARTED'){
-        $('#lottoStatus').textContent = 'กิจกรรมยังไม่ถึงเวลาเริ่ม กรุณารอถึงเวลาที่กำหนด';
-        if(button) button.disabled = false;
-        if(input) input.disabled = false;
-        return;
-      }
-      if(res && res.errorCode === 'ACTIVITY_CLOSED'){
-        $('#lottoStatus').textContent = 'กิจกรรมสิ้นสุดตามเวลาที่กำหนดแล้ว';
-        if(button) button.disabled = false;
-        if(input) input.disabled = false;
-        return;
-      }
-      $('#lottoStatus').textContent = 'ระบบยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาติดต่อผู้ดูแลระบบ';
+      $('#lottoStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณากดส่งอีกครั้ง';
       if(button) button.disabled = false;
       if(input) input.disabled = false;
       return;
@@ -6628,7 +6492,7 @@ async function submitLottoAnswer(){
     fanoutSubmissionAfterDisplay_(payload, res);
   }catch(err){
     console.error('submit lotto failed', err);
-    $('#lottoStatus').textContent = 'ระบบยังยืนยันการบันทึกคำตอบไม่ได้ กรุณาติดต่อผู้ดูแลระบบ';
+    $('#lottoStatus').textContent = 'ยังยืนยันการบันทึกคำตอบไม่ได้ กรุณากดส่งอีกครั้ง';
     if(button) button.disabled = false;
     if(input) input.disabled = false;
   }
@@ -6771,41 +6635,17 @@ function _annualCanonGroup_(v){
   if(!m) return s;
   return 'G'+String(Number(m[1])).padStart(2,'0');
 }
-function _annualParseDate_(value){
-  var s=_annualText_(value);
-  if(!s) return null;
-  var d=null, m;
-
-  // ISO / Firebase timestamp เช่น 2026-07-07T01:48:04.889Z หรือ 2026-07-07 08:46:03
-  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
-    d=new Date(s.replace(' ','T'));
-    return (d && !isNaN(d.getTime())) ? d : null;
-  }
-
-  // Thai/Sheet display: DD/MM/YYYY, DD/MM/พ.ศ. หรือ D/M/YYYY HH:mm:ss
-  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if(m){
-    var y=Number(m[3]);
-    if(y>2400) y-=543;
-    if(y<100) y+=2000;
-    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
-    return (d && !isNaN(d.getTime())) ? d : null;
-  }
-
-  d=new Date(s);
-  return (d && !isNaN(d.getTime())) ? d : null;
-}
 function _annualDateText_(value){
   var s=_annualText_(value);
   if(!s) return '—';
-  var d=_annualParseDate_(s);
-  if(!d) return s;
+  var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  var d;
+  if(m){
+    var y=Number(m[3]); if(y>2400) y-=543; if(y<100) y+=2000;
+    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
+  }else d=new Date(s);
+  if(!d || isNaN(d.getTime())) return s;
   return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+(d.getFullYear()+543);
-}
-function _annualRowTime_(r){
-  var raw=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||r.AppliedAt||r.appliedAt||r.GroupPointAppliedAt||r.groupPointAppliedAt||'';
-  var d=_annualParseDate_(raw);
-  return d ? d.getTime() : 0;
 }
 function _annualToRows_(value){
   if(!value) return [];
@@ -6830,10 +6670,9 @@ function renderAnnual(){
     if(!seen[key]){ seen[key]=true; rows.push(r); }
   });
   rows.sort(function(a,b){
-    var db=_annualRowTime_(b);
-    var da=_annualRowTime_(a);
-    if(db!==da) return db-da; // วันที่ล่าสุดก่อน
-    return _annualText_(b.Title||b.title||b.FormTitle||b.formTitle).localeCompare(_annualText_(a.Title||a.title||a.FormTitle||a.formTitle),'th');
+    var da=new Date(a.Timestamp||a.timestamp||a.AwardedAt||a.awardedAt||0).getTime()||0;
+    var db=new Date(b.Timestamp||b.timestamp||b.AwardedAt||b.awardedAt||0).getTime()||0;
+    return db-da;
   });
   tbody.innerHTML=rows.length ? rows.map(function(r){
     var date=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||'';
@@ -7810,7 +7649,7 @@ try{
    * unconfirmed answer immediately. The same request id is retained and one
    * idempotent retry is performed only after a Sheet-receipt search.
    */
-  const __legacyPostSubmissionToSheet_20260629 = async function(payload){
+  postSubmissionToSheet = async function(payload){
     const url = String((typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL) || '').trim();
     const sap = String((payload && payload.sap) || (state && state.sap) || '').trim();
     const actId = String((payload && payload.actId) || '').trim();
@@ -7818,21 +7657,13 @@ try{
     if(!sap || !actId) return {ok:false, error:'missing sap or actId'};
     if(__anesaSheetSubmitBusy) return {ok:false, error:'sending'};
 
-    /*
-     * SS2 UX PATCH 2026-08-25
-     * Hard confirmation budget: 58 seconds.
-     * Keeps Sheet-first + duplicate protection, but never lets the UI wait 2-3 minutes.
-     */
-    const hardDeadlineAt = Date.now() + 58000;
-    const remainingMs = () => Math.max(0, hardDeadlineAt - Date.now());
-
     const day = submitDayKey_();
     const pendingKey = `ans_pending:${day}:${sap}:${actId}`;
     const finalKey = `ans:${day}:${sap}:${actId}`;
     __anesaSheetSubmitBusy = true;
 
     let pending = null;
-    try{ pending = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){}
+    try{ pending = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){ }
     const requestId = String(
       (payload && payload.requestId) ||
       (pending && pending.requestId) ||
@@ -7841,7 +7672,7 @@ try{
     try{
       sessionStorage.setItem(pendingKey, JSON.stringify({requestId, at:Date.now()}));
       localStorage.setItem(pendingKey, String(Date.now()));
-    }catch(_){}
+    }catch(_){ }
 
     const request = Object.assign({}, payload || {}, {
       action:'submitAnswer',
@@ -7851,124 +7682,39 @@ try{
       client:String((payload && payload.client) || 'web-anesa+')
     });
 
-    // Business-rule rejections are final for this click. Return them immediately
-    // instead of wasting time on receipt polling / retry.
-    const isTerminalSubmissionError_ = function(result){
-      const code = String((result && (result.errorCode || result.error)) || '').trim();
-      return [
-        'USER_NON_ACTIVE',
-        'USER_NOT_FOUND',
-        'ALREADY_ANSWERED_PROTOCOL',
-        'ACTIVITY_NOT_STARTED',
-        'ACTIVITY_CLOSED',
-        'missing sap or actId'
-      ].includes(code);
-    };
-
-    const hardFetch = function(body, wantedTimeoutMs){
-      const left = remainingMs();
-      if(left <= 0) return Promise.resolve({ok:false, error:'CLIENT_CONFIRM_TIMEOUT_60S'});
-      const timeoutMs = Math.max(250, Math.min(Number(wantedTimeoutMs || 4000), left));
-
-      const fetchPromise = fetchJSONWithTimeout_(url, {
+    try{
+      /* One user click sends exactly one submit POST. Aborting a fetch does not
+         cancel the Apps Script execution, so a second POST only increases the
+         queue during the 8–10-user opening burst. */
+      let result = await fetchJSONWithTimeout_(url, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(body),
+        body:JSON.stringify(request),
         cache:'no-store',
         keepalive:false
-      }, timeoutMs);
+      }, 22000);
 
-      const hardTimer = new Promise(resolve => {
-        setTimeout(() => resolve({ok:false, error:'timeout'}), timeoutMs + 80);
-      });
-      return Promise.race([fetchPromise, hardTimer]);
-    };
-
-    const sleepWithinDeadline = async function(ms){
-      const left = remainingMs();
-      if(left <= 0) return false;
-      await new Promise(resolve => setTimeout(resolve, Math.min(ms, left)));
-      return remainingMs() > 0;
-    };
-
-    const readReceiptFast = async function(){
-      const raw = await hardFetch({
-        action:'submission:receipt',
-        sap,
-        actId,
-        dayKey:day
-      }, 4000);
-      return ss2MakeReceiptResult_(raw);
-    };
-
-    const findReceiptFast = async function(delays){
-      for(let i=0; i<delays.length; i++){
-        if(remainingMs() <= 0) return null;
-        if(delays[i] > 0){
-          const okToContinue = await sleepWithinDeadline(delays[i]);
-          if(!okToContinue) return null;
-        }
-        const found = await readReceiptFast();
-        if(found) return found;
-      }
-      return null;
-    };
-
-    try{
-      let result = await hardFetch(request, 16000);
       if(result && result.ok){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
-        return result;
-      }
-      if(result && !result.ok && isTerminalSubmissionError_(result)){
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
         return result;
       }
 
-      /*
-       * SERVER_BUSY_RETRY means that execution never acquired DocumentLock,
-       * so it did not append a Sheet row. Retry the SAME requestId quickly
-       * instead of spending several seconds polling the Sheet first.
-       */
-      if(result && result.error === 'SERVER_BUSY_RETRY' && remainingMs() > 1200){
-        await sleepWithinDeadline(350);
-        result = await hardFetch(request, 16000);
-        if(result && result.ok){
-          try{ localStorage.setItem(finalKey,'1'); }catch(_){}
-          return result;
-        }
-        if(result && !result.ok && isTerminalSubmissionError_(result)){
-          return result;
-        }
-      }
-
-      let receiptResult = await findReceiptFast([0, 600, 1200]);
+      /* The original Apps Script execution may still finish after a transport
+         timeout. Poll only the durable Sheet receipt; never POST the answer a
+         second time. */
+      const receiptResult = await ss2ReadReceiptUntilFound_(
+        sap, actId, [0,1200,2500,4500]
+      );
       if(receiptResult){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
         return receiptResult;
       }
 
-      if(remainingMs() > 1200){
-        result = await hardFetch(request, 14000);
-        if(result && result.ok){
-          try{ localStorage.setItem(finalKey,'1'); }catch(_){}
-          return result;
-        }
-        if(result && !result.ok && isTerminalSubmissionError_(result)){
-          return result;
-        }
-      }
-
-      receiptResult = await findReceiptFast([0, 600, 1200]);
-      if(receiptResult){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
-        return receiptResult;
-      }
-
-      return {ok:false, error:'CLIENT_CONFIRM_TIMEOUT_60S'};
+      return result || {ok:false, error:'sheet_receipt_not_found'};
     }finally{
       __anesaSheetSubmitBusy = false;
-      try{ sessionStorage.removeItem(pendingKey); }catch(_){}
-      try{ localStorage.removeItem(pendingKey); }catch(_){}
+      try{ sessionStorage.removeItem(pendingKey); }catch(_){ }
+      try{ localStorage.removeItem(pendingKey); }catch(_){ }
     }
   };
 
@@ -7976,7 +7722,7 @@ try{
    * Fan-out is display-only, but retrying it once makes the RTDB snapshot and
    * Top20 update resilient without ever appending a Sheet row or awarding points.
    */
-  const __legacyFanoutSubmissionAfterDisplay_20260629 = function(payload, confirmed){
+  fanoutSubmissionAfterDisplay_ = function(payload, confirmed){
     const sap = String((payload && payload.sap) || '').trim();
     const actId = String((payload && payload.actId) || '').trim();
     if(!sap || !actId || !confirmed || !confirmed.ok) return;
@@ -8100,31 +7846,6 @@ try{
     return '';
   }
 
-  /* V5.3.1 UI HOTFIX — preload user/group labels from Firebase only.
-     This fixes the first Top20 frame showing "-" for Group when an older
-     winnersByDate row does not yet contain GroupNumber/GroupName.
-     No Spreadsheet read is added to the submit hot path. */
-  const __ss2Top20UserGroupV531 = { users:{}, groups:{}, ready:false, promise:null };
-
-  function ss2WarmTop20UserGroupV531_(){
-    if(__ss2Top20UserGroupV531.ready) return Promise.resolve(__ss2Top20UserGroupV531);
-    if(__ss2Top20UserGroupV531.promise) return __ss2Top20UserGroupV531.promise;
-    __ss2Top20UserGroupV531.promise = ensureFirebase().then(async FB=>{
-      const snaps = await Promise.all([
-        FB.get(FB.ref(FB.db,'public/usersSummary')),
-        FB.get(FB.ref(FB.db,'public/userGroups'))
-      ]);
-      __ss2Top20UserGroupV531.users = snaps[0].val() || {};
-      __ss2Top20UserGroupV531.groups = snaps[1].val() || {};
-      __ss2Top20UserGroupV531.ready = true;
-      return __ss2Top20UserGroupV531;
-    }).catch(err=>{
-      console.warn('V5.3.1 Top20 group preload failed:', err);
-      return __ss2Top20UserGroupV531;
-    }).finally(()=>{ __ss2Top20UserGroupV531.promise = null; });
-    return __ss2Top20UserGroupV531.promise;
-  }
-
   function ss2Top20RowsFromRealtime_(ctx, dayData){
     /*
      * Firebase is only a fast display mirror. Apply the same strict winner
@@ -8132,9 +7853,6 @@ try{
      * wrong, pending, or non-fast answers before reconciliation completes.
      */
     const perAct = dayData && typeof dayData === 'object' ? dayData : {};
-    const labelHelpers = top20TodayResolveUserCaches_(
-      __ss2Top20UserGroupV531.users, __ss2Top20UserGroupV531.groups
-    );
     const records = [];
     Object.keys(perAct).forEach(actId=>{
       if(actId === '_top20Today') return;
@@ -8151,12 +7869,11 @@ try{
 
         const sap = String(row.sap || row.SAP || key || '').trim();
         if(!sap) return;
-        const userMeta = __ss2Top20UserGroupV531.users[sap] || {};
         records.push({
           actId:String(actId || '').trim(),
           sap,
-          name:labelHelpers.nameLabel(userMeta, row, sap),
-          group:labelHelpers.groupLabel(userMeta, row),
+          name:String(row.name || row.Name || sap).trim() || sap,
+          group:String(row.GroupName || row.groupName || row.GroupNumber || row.groupNumber || '-').trim() || '-',
           row:Number(row.row || row.order || 999999999) || 999999999,
           ts:String(row.ts || row.tsISO || row.timestamp || row.UpdatedAt || ''),
           payload:row
@@ -8227,7 +7944,6 @@ try{
   ensureOwnAnsweredRealtime_ = function(){
     try{
       if(!state || !state.sap) return;
-      try{ ss2WarmTop20UserGroupV531_(); }catch(_){}
       const day = todayKey();
       if(state._ss2OwnAnswerListenerDay === day && typeof state.offOwnAnsweredRealtime === 'function') return;
 
@@ -8282,20 +7998,6 @@ try{
    * still converges to the authoritative arrival order after a reconnect.
    */
   openTop20TodayRealtime_ = function(){
-    try{
-      ss2WarmTop20UserGroupV531_().then(()=>{
-        try{
-          const ctxNow=ss2Top20TodayContext_();
-          const rawNow=state && state._ss2Top20RawDay;
-          if(!ctxNow || !rawNow) return;
-          const packetNow=ss2StoreRealtimeTop20_(ctxNow, rawNow);
-          const dlgNow=$('#dlgTop');
-          if(packetNow && dlgNow && dlgNow.open && state.top20DialogKind==='top20today'){
-            renderTop20TodayTableRealtime_(packetNow.rows, packetNow.protocol);
-          }
-        }catch(_){}
-      });
-    }catch(_){}
     if(state && state.userActive === false){
       try{ forceLogout('บัญชีถูกปิดใช้งาน (non-active)'); }catch(_){}
       return;
@@ -8336,15 +8038,9 @@ try{
     try{
       const ctx=ss2Top20TodayContext_();
       if(!ctx) return;
-      let packet=null;
-      const raw=state && state._ss2Top20RawDay;
-      if(raw) packet=ss2StoreRealtimeTop20_(ctx,raw);
-      if(!packet && typeof ss2GetRealtimeTop20_==='function') packet=ss2GetRealtimeTop20_(ctx);
-      const dlg=document.getElementById('dlgTop');
-      if(packet && dlg && dlg.open && state.top20DialogKind==='top20today'){
-        renderTop20TodayTableRealtime_(packet.rows||[],!!packet.protocol);
-      }
-      // No immediate Sheet refresh here; user-opened Top20 still reconciles authoritatively.
+      const raw=state._ss2Top20RawDay;
+      if(raw) ss2StoreRealtimeTop20_(ctx,raw);
+      ss2RefreshTop20TodayFromSheet_(ctx, true).catch(()=>{});
     }catch(_){}
   };
 
@@ -8360,9 +8056,20 @@ try{
    */
   let __ss2KpiSubmitRefreshTimer = null;
   scheduleUserKPIRefreshAfterSubmit_ = function(){
-    try{ if(__ss2KpiSubmitRefreshTimer){ clearTimeout(__ss2KpiSubmitRefreshTimer); __ss2KpiSubmitRefreshTimer=null; } }catch(_){}
-    // Sheet-confirmed KPI is already applied by the submit response. Avoid a burst reread.
-    try{ if(typeof renderKPI === 'function') renderKPI(); }catch(_){}
+    try{ if(__ss2KpiSubmitRefreshTimer) clearTimeout(__ss2KpiSubmitRefreshTimer); }catch(_){}
+    __ss2KpiSubmitRefreshTimer = setTimeout(async function(){
+      __ss2KpiSubmitRefreshTimer = null;
+      try{
+        if(typeof refreshUserSummary === 'function') await refreshUserSummary('sheetOnly');
+        const groupNo = String((state && (state.groupNumber || state.GroupNumber)) || '').trim();
+        if(groupNo && typeof refreshGroupTotalDirect_ === 'function'){
+          await refreshGroupTotalDirect_(groupNo);
+        }
+        if(typeof renderKPI === 'function') renderKPI();
+      }catch(e){
+        console.warn('coalesced Sheet KPI refresh failed:', e);
+      }
+    }, 2200);
   };
 
   startSheetKPIWatcher_ = function(){
@@ -9040,6 +8747,11 @@ function getRolling3MonthLabel(){
 </script>
 
 
+<script>
+
+
+
+
 <!-- ===== PRIVILEGE MODAL ===== -->
 <div id="privModal" class="modal">
   <div class="modal-box">
@@ -9424,20 +9136,5 @@ document.addEventListener('click', function(e){
           without delaying the dialog.
      Scope: Top20 Today only. No score, user, group, activity, or form logic.
      ========================================================= -->
-
-
-<!-- ========================================================================
- ANESA+ SS2 V5.3.4 — 2026-09-02
- FAST CONFIRM UX: preserves the V5.3.3 confirmed-close behavior and disables
- the superseded 2026-06-29 client transport/fanout overrides that were still
- replacing the final 30-second transport with an obsolete 58-second retry path.
- No backend/data-model/scoring change.
- ======================================================================== -->
-<script id="anesa-v534-fast-confirm-diagnostic">
-window.ANESA_FINAL_STABLE_FAST_SUBMIT_V53={version:'20260902_V5_3_4_FAST_CONFIRM_NO_LEGACY_OVERRIDE',maxUserWaitMs:30000,lockMaxWaitMs:23000,automaticSecondSubmit:false,moduleIntegrated:true,confirmedCloseImmediate:true};
-window.ANESA_FINAL_STABLE_FAST_SUBMIT_V52={version:'20260902_V5_3_4_FAST_CONFIRM_NO_LEGACY_OVERRIDE',immediatePostSubmitSheetReads:false,fanoutSpreadsheetReads:false,moduleIntegrated:true,structureChanged:false};
-</script>
-
-<!-- ANESA SS2 V5.3.1: Top20 immediate group-label hotfix; Firebase-only metadata fallback; no Sheet schema/logic change. -->
 </body>
 </html>
