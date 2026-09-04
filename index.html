@@ -2186,7 +2186,7 @@ input, select, button{
 
 <footer style="text-align:center;color:#8b94b2;font-size:11px;margin:8px 0">
   © 2025 | ภาควิชาวิสัญญีวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล<br>
-  <span style="font-size:10px;opacity:.85">Version 2.0.2 </span>
+  <span style="font-size:10px;opacity:.85">Version 2.0.3</span>
 </footer>
 
 <script type="module">
@@ -6635,17 +6635,41 @@ function _annualCanonGroup_(v){
   if(!m) return s;
   return 'G'+String(Number(m[1])).padStart(2,'0');
 }
+function _annualParseDate_(value){
+  var s=_annualText_(value);
+  if(!s) return null;
+  var d=null, m;
+
+  // ISO / Firebase timestamp เช่น 2026-07-07T01:48:04.889Z หรือ 2026-07-07 08:46:03
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
+    d=new Date(s.replace(' ','T'));
+    return (d && !isNaN(d.getTime())) ? d : null;
+  }
+
+  // Thai/Sheet display: DD/MM/YYYY, DD/MM/พ.ศ. หรือ D/M/YYYY HH:mm:ss
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(m){
+    var y=Number(m[3]);
+    if(y>2400) y-=543;
+    if(y<100) y+=2000;
+    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
+    return (d && !isNaN(d.getTime())) ? d : null;
+  }
+
+  d=new Date(s);
+  return (d && !isNaN(d.getTime())) ? d : null;
+}
 function _annualDateText_(value){
   var s=_annualText_(value);
   if(!s) return '—';
-  var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  var d;
-  if(m){
-    var y=Number(m[3]); if(y>2400) y-=543; if(y<100) y+=2000;
-    d=new Date(y, Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
-  }else d=new Date(s);
-  if(!d || isNaN(d.getTime())) return s;
+  var d=_annualParseDate_(s);
+  if(!d) return s;
   return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+(d.getFullYear()+543);
+}
+function _annualRowTime_(r){
+  var raw=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||r.AppliedAt||r.appliedAt||r.GroupPointAppliedAt||r.groupPointAppliedAt||'';
+  var d=_annualParseDate_(raw);
+  return d ? d.getTime() : 0;
 }
 function _annualToRows_(value){
   if(!value) return [];
@@ -6670,9 +6694,10 @@ function renderAnnual(){
     if(!seen[key]){ seen[key]=true; rows.push(r); }
   });
   rows.sort(function(a,b){
-    var da=new Date(a.Timestamp||a.timestamp||a.AwardedAt||a.awardedAt||0).getTime()||0;
-    var db=new Date(b.Timestamp||b.timestamp||b.AwardedAt||b.awardedAt||0).getTime()||0;
-    return db-da;
+    var db=_annualRowTime_(b);
+    var da=_annualRowTime_(a);
+    if(db!==da) return db-da; // วันที่ล่าสุดก่อน
+    return _annualText_(b.Title||b.title||b.FormTitle||b.formTitle).localeCompare(_annualText_(a.Title||a.title||a.FormTitle||a.formTitle),'th');
   });
   tbody.innerHTML=rows.length ? rows.map(function(r){
     var date=r.Timestamp||r.timestamp||r.AwardedAt||r.awardedAt||'';
@@ -7663,7 +7688,7 @@ try{
     __anesaSheetSubmitBusy = true;
 
     let pending = null;
-    try{ pending = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){ }
+    try{ pending = JSON.parse(sessionStorage.getItem(pendingKey) || 'null'); }catch(_){}
     const requestId = String(
       (payload && payload.requestId) ||
       (pending && pending.requestId) ||
@@ -7672,7 +7697,7 @@ try{
     try{
       sessionStorage.setItem(pendingKey, JSON.stringify({requestId, at:Date.now()}));
       localStorage.setItem(pendingKey, String(Date.now()));
-    }catch(_){ }
+    }catch(_){}
 
     const request = Object.assign({}, payload || {}, {
       action:'submitAnswer',
@@ -7682,39 +7707,49 @@ try{
       client:String((payload && payload.client) || 'web-anesa+')
     });
 
-    try{
-      /* One user click sends exactly one submit POST. Aborting a fetch does not
-         cancel the Apps Script execution, so a second POST only increases the
-         queue during the 8–10-user opening burst. */
-      let result = await fetchJSONWithTimeout_(url, {
+    const postOnce = function(timeoutMs){
+      return fetchJSONWithTimeout_(url, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify(request),
         cache:'no-store',
         keepalive:false
-      }, 22000);
+      }, timeoutMs);
+    };
 
+    try{
+      let result = await postOnce(16000);
       if(result && result.ok){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
         return result;
       }
 
-      /* The original Apps Script execution may still finish after a transport
-         timeout. Poll only the durable Sheet receipt; never POST the answer a
-         second time. */
-      const receiptResult = await ss2ReadReceiptUntilFound_(
-        sap, actId, [0,1200,2500,4500]
-      );
+      /* The Apps Script request may already have committed during a transport
+         timeout.  Check the durable receipt before any retry. */
+      let receiptResult = await ss2ReadReceiptUntilFound_(sap, actId, [0,700,1200,1800]);
       if(receiptResult){
-        try{ localStorage.setItem(finalKey,'1'); }catch(_){ }
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
         return receiptResult;
       }
 
+      /* One safe retry with the SAME id. Server-side SAP+ActID/day guards stop
+         duplicate rows and duplicate awards even if the first request completes
+         concurrently. */
+      result = await postOnce(16000);
+      if(!(result && result.ok)){
+        receiptResult = await ss2ReadReceiptUntilFound_(sap, actId, [0,700,1200,1800,2500]);
+        if(receiptResult) result = receiptResult;
+      }
+
+      if(result && result.ok){
+        try{ localStorage.setItem(finalKey,'1'); }catch(_){}
+        return result;
+      }
       return result || {ok:false, error:'sheet_receipt_not_found'};
     }finally{
       __anesaSheetSubmitBusy = false;
-      try{ sessionStorage.removeItem(pendingKey); }catch(_){ }
-      try{ localStorage.removeItem(pendingKey); }catch(_){ }
+      try{ sessionStorage.removeItem(pendingKey); }catch(_){}
+      try{ localStorage.removeItem(pendingKey); }catch(_){}
     }
   };
 
